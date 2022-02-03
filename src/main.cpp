@@ -21,11 +21,11 @@
 // (Use the VS Command Prompt matching your REAPER architecture, eg. x64 to use the 64-bit compiler)
 // cl /nologo /O2 /Z7 /Zo /DUNICODE main.cpp /link /DEBUG /OPT:REF /PDBALTPATH:%_PDB% /DLL /OUT:reaper_barebone.dll
 
-#include <stdio.h>
+#include <iostream>
 
 #define REAPERAPI_IMPLEMENT
 // automatically check if registered api call is valid 
-#define BAIL_IF_NO_REG(x) if (!x) { return 0; }
+#define BAIL_IF_NO_REG(x) if (!x) { std::cerr<<"failed to register function "<<x<<std::endl; return 0; }
 #define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x) ; BAIL_IF_NO_REG(x) ;
 
 #include "reaper_plugin_functions.h"
