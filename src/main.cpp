@@ -30,16 +30,22 @@
 
 #include "reaper_plugin_functions.h"
 #include <cstdio>
+#include <string>
 
-int register_action_hook(std::string desc, std::string action_name, reaper_plugin_info_t *rec) {
-  int new_action_id = plugin_register("command_id", (void*)action_name);
-  gaccel_register_t new_action;
-  new_action.desc = desc;
+static bool testAction(int commandId, int flat){
+  ShowConsoleMsg("hello world!\n");
+  return true;
+}
 
-  if (!rec->Register("hookcustommenu", &testAction)) {
-    std::cerr << "Failed to register actioin:  " << action_name << std::endl; 
-  }
-  return new_action_id
+int register_action_hook(std::string desc, std::string action_name, void* function_address, reaper_plugin_info_t *rec) {
+    int new_action_id = plugin_register("command_id", static_cast<void*>(&action_name));
+    gaccel_register_t new_action;
+    new_action.desc = desc.c_str();
+
+    if (!rec->Register("hookcustommenu", function_address)) {
+        std::cerr << "Failed to register actioin:  " << action_name << std::endl;
+    }
+    return new_action_id;
 }
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
@@ -71,13 +77,11 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
     return 0;
   }
 
+  int kiwi_action_id = register_action_hook("the first test action B)", "kiwi test action", &testAction, rec);
+
   // initialization code here
-  
 
   return 1;
 }
 
-static bool testAction(int commandId, int flat){
-  ShowConsoleMsg("hello world!\n");
-  return true;
-}
+
