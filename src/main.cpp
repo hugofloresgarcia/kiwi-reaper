@@ -15,9 +15,7 @@ static bool testAction(int commandId, int flat){
 }
 
 int register_action_hook(std::string desc, std::string action_name, void* function_address, reaper_plugin_info_t *rec) {
-    int new_action_id = plugin_register("command_id", static_cast<void*>(&action_name));
-    gaccel_register_t new_action;
-    new_action.desc = desc.c_str();
+    int new_action_id = plugin_register("command_id", (void*)"kiwiTestAction");
 
     if (!rec->Register("hookcustommenu", function_address)) {
         std::cerr << "Failed to register actioin:  " << action_name << std::endl;
