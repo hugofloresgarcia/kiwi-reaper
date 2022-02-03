@@ -14,11 +14,11 @@ static bool testAction(int commandId, int flat){
   return true;
 }
 
-int register_action_hook(std::string desc, std::string action_name, void* function_address, reaper_plugin_info_t *rec) {
+int register_action_hook(void* function_address, reaper_plugin_info_t *rec) {
     int new_action_id = plugin_register("command_id", (void*)"kiwiTestAction");
 
-    if (!rec->Register("hookcustommenu", function_address)) {
-        std::cerr << "Failed to register actioin:  " << action_name << std::endl;
+    if (!rec->Register("hookcommand", function_address)) {
+        return 0;
     }
     return new_action_id;
 }
@@ -52,7 +52,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
     return 0;
   }
 
-  int kiwi_action_id = register_action_hook("the first test action B)", "kiwi test action", &testAction, rec);
+  int kiwi_action_id = register_action_hook(&testAction, rec);
 
   // initialization code here
 
