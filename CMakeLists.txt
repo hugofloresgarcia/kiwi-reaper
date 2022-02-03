@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # set project name and version
@@ -41,8 +41,11 @@ set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME kiwi) # avoid an empty "Unspecified" co
 
 
 add_library(kiwi SHARED
+    include/oscpkt/oscpkt.hh
+    include/oscpkt/udp.hh
+    src/osc.cpp
     src/main.cpp
-  )
+)
   
 target_include_directories(kiwi PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}

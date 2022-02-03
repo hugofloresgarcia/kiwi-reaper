@@ -41,6 +41,8 @@
 #  pragma comment(lib, "ws2_32.lib")
 # endif
 #else
+# include <iostream>
+# include <unistd.h>
 # include <sys/socket.h>
 # include <netinet/in.h>
 # include <netdb.h>
