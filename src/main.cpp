@@ -22,8 +22,10 @@
 // cl /nologo /O2 /Z7 /Zo /DUNICODE main.cpp /link /DEBUG /OPT:REF /PDBALTPATH:%_PDB% /DLL /OUT:reaper_barebone.dll
 
 #define REAPERAPI_IMPLEMENT
-#include "reaper_plugin_functions.h"
+// automatically check if registered api call is valid 
+#define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x)?; if (!x) std::cerr << "Failed to vaildate function pointer: " << x << std::endl; 
 
+#include "reaper_plugin_functions.h"
 #include <cstdio>
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
