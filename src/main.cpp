@@ -15,12 +15,10 @@ static bool testAction(int commandId, int flat){
 }
 
 int register_action_hook(void* function_address, reaper_plugin_info_t *rec) {
-    int new_action_id = plugin_register("command_id", (void*)"kiwiTestAction");
-
-    if (!rec->Register("hookcommand", function_address)) {
+    if (!rec->Register("hookcommand2", function_address)) {
         return 0;
     }
-    return new_action_id;
+    return 1;
 }
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
@@ -52,7 +50,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
     return 0;
   }
 
-  int kiwi_action_id = register_action_hook(&testAction, rec);
+  int kiwi_action_id = register_action_hook((void*)&testAction, rec);
 
   // initialization code here
 
