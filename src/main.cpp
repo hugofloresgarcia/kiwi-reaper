@@ -8,26 +8,25 @@
 #include "reaper_plugin_functions.h"
 #include <cstdio>
 #include <string>
+#include <utility>
+
+#include "controller.h"
 
 static bool testAction(int commandId, int flat){
   ShowConsoleMsg("hello world!\n");
   return true;
 }
 
-int register_action_hook(void* function_address, reaper_plugin_info_t *rec) {
-    if (!rec->Register("hookcommand2", function_address)) {
-        return 0;
-    }
-    return 1;
-}
+static std::string ADDRESS = "127.0.0.1";
+static int SEND_PORT = 8000;
+static int RECV_PORT = 8001;
+
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REAPER_PLUGIN_HINSTANCE instance, reaper_plugin_info_t *rec)
 {
-  if(!rec) {
-    // cleanup code here
+  if(!rec)
     return 0;
-  }
 
   if(rec->caller_version != REAPER_PLUGIN_VERSION)
     return 0;
@@ -41,16 +40,21 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(AudioAccessorValidateState, rec);
   REG_FUNC(DestroyAudioAccessor, rec);
+  REG_FUNC(ShowConsoleMsg, rec);
 
-  // see also https://gist.github.com/cfillion/350356a62c61a1a2640024f8dc6c6770
-  ShowConsoleMsg = (decltype(ShowConsoleMsg))rec->GetFunc("ShowConsoleMsg");
-  
-  if(!ShowConsoleMsg) {
-    fprintf(stderr, "[reaper_barebone] Unable to import ShowConsoleMsg\n");
+  // setup network
+  OSCManager osc {ADDRESS, SEND_PORT, RECV_PORT};
+  if (!osc.init()) {
+    ShowConsoleMsg("KIWI: failed to initialize OSC manager\n");
     return 0;
   }
 
-  int kiwi_action_id = register_action_hook((void*)&testAction, rec);
+  // create controller
+  OSCController *controller = new OSCController(std::move(osc));
+
+  // register action hooks
+  if (!rec->Register("csurf_inst", (void *)controller))
+    return 0;
 
   // initialization code here
 
