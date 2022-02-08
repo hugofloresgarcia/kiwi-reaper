@@ -41,16 +41,14 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(AudioAccessorValidateState, rec);
   REG_FUNC(DestroyAudioAccessor, rec);
   REG_FUNC(ShowConsoleMsg, rec);
-
-  // setup network
-  OSCManager osc {ADDRESS, SEND_PORT, RECV_PORT};
-  if (!osc.init()) {
-    ShowConsoleMsg("KIWI: failed to initialize OSC manager\n");
-    return 0;
-  }
+  REG_FUNC(MoveEditCursor, rec);
 
   // create controller
-  OSCController *controller = new OSCController(std::move(osc));
+  OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);
+  if (!controller->init()) {
+    ShowConsoleMsg("KIWI: failed to initialize OSC controller\n");
+    return 0;
+  }
 
   // register action hooks
   if (!rec->Register("csurf_inst", (void *)controller))

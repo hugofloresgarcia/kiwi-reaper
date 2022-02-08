@@ -4,9 +4,12 @@
 #include <stdio.h>
 #include <map>
 
-using OSCCallback = std::function<void(oscpkt::Message&)>;
+// return true if you successfully handled the message
+// and popped all the arguments
+using OSCCallback = std::function<bool(oscpkt::Message&)>;
 
 class OSCManager {
+  OSCManager();
 
 public:
   OSCManager(std::string &addr, int send_port, int recv_port)
@@ -28,11 +31,10 @@ public:
 
       // pop as many messages as are in the packet
       while (reader.isOk() && (msg = reader.popMessage()) != 0) {
-        // try to pattern match
-        for (const auto &pair : m_patterns){
-          // if we have a match, call the callback
-          if (msg->match(pair.first))
-            pair.second(*msg);
+        for (const auto &callback : m_callbacks){
+          // if the callback matched and processed the message, break
+          if(callback(*msg))
+            break;
         }
       }
     }
@@ -46,12 +48,12 @@ public:
     return m_send_sock.sendPacket(writer.packetData(), writer.packetSize());
   }
 
-  void add_callback(std::string pattern, OSCCallback callback) {
-    m_patterns[pattern] = callback;
+  void add_callback(OSCCallback callback) {
+    m_callbacks.emplace_back(callback);
   }
 
 private:
-  std::map<std::string, OSCCallback> m_patterns;
+  std::vector<OSCCallback> m_callbacks;
 
   std::string m_addr {"localhost"} ;
   int m_send_port {0};
