@@ -12,7 +12,9 @@ public:
   virtual const char* GetConfigString() override { return ""; }
 
   bool init () {
-    return m_manager->init();
+    bool success = m_manager->init();
+    add_callbacks();
+    return success;
   }
 
   virtual ~OSCController() {}
@@ -25,16 +27,32 @@ public:
     using Msg = oscpkt::Message;
 
     // add a callback to listen to
-    m_manager->add_callback(
-      [](Msg& msg){
-        double move_amt;
-        if (msg.match("/move_edit_cursor").popDouble(move_amt).isOkNoMoreArgs()){
-          MoveEditCursor(move_amt, false);
-          return true;
-        } else {
-          return false;
-        }
+    m_manager->add_callback("/move_edit_cursor",
+    [](Msg& msg){
+      float move_amt;
+      if (msg.arg().popFloat(move_amt).isOkNoMoreArgs()){
+        SetEditCurPos(
+          GetCursorPosition() + (double)move_amt, 
+          true, true
+        );
+      }
     });
+
+    m_manager->add_callback("/zoom",
+    [](Msg& msg){
+      int xdir;
+      if (msg.arg().popInt32(xdir).isOkNoMoreArgs()){
+        CSurf_OnZoom(xdir, 0);
+      }
+    });
+
+    // m_manager->add_callback("/get_amplitude_at_time", 
+    // [](Msg& msg){
+    //   float time;
+    //   if (msg.arg().popFloat(time)){
+    //     double pix_per_sec = GetHZoomLevel();
+    //   }
+    // });
   };
 
   // this runs about 30x per second. do all OSC polling here
@@ -45,5 +63,4 @@ public:
 
 private:
   std::unique_ptr<OSCManager> m_manager {nullptr};
-
 };

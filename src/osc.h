@@ -6,7 +6,7 @@
 
 // return true if you successfully handled the message
 // and popped all the arguments
-using OSCCallback = std::function<bool(oscpkt::Message&)>;
+using OSCCallback = std::function<void(oscpkt::Message&)>;
 
 class OSCManager {
   OSCManager();
@@ -31,10 +31,10 @@ public:
 
       // pop as many messages as are in the packet
       while (reader.isOk() && (msg = reader.popMessage()) != 0) {
-        for (const auto &callback : m_callbacks){
-          // if the callback matched and processed the message, break
-          if(callback(*msg))
-            break;
+        for (const auto &pair : m_callbacks){
+          // only call if pattern matches
+          if (msg->match(pair.first).isOk())
+            pair.second(*msg);
         }
       }
     }
@@ -48,12 +48,12 @@ public:
     return m_send_sock.sendPacket(writer.packetData(), writer.packetSize());
   }
 
-  void add_callback(OSCCallback callback) {
-    m_callbacks.emplace_back(callback);
+  void add_callback(std::string pattern, OSCCallback callback) {
+    m_callbacks[pattern] = callback;
   }
 
 private:
-  std::vector<OSCCallback> m_callbacks;
+  std::map<std::string, OSCCallback> m_callbacks;
 
   std::string m_addr {"localhost"} ;
   int m_send_port {0};

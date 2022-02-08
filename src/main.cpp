@@ -42,6 +42,10 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(DestroyAudioAccessor, rec);
   REG_FUNC(ShowConsoleMsg, rec);
   REG_FUNC(MoveEditCursor, rec);
+  REG_FUNC(GetCursorPosition, rec);
+  REG_FUNC(SetEditCurPos, rec);
+  REG_FUNC(CSurf_OnZoom, rec);
+  REG_FUNC(GetHZoomLevel, rec);
 
   // create controller
   OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);
