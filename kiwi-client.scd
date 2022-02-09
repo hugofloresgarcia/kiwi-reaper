@@ -28,4 +28,17 @@ Routine({
 }).play;
 )
 
+// get waveform display
+(
+Routine({
+	1.do({
+		b.sendMsg("/get_amplitude_at_time", 5.0);
+		1.wait;
+	});
+}).play;
+)
+
 OSCFunc.trace(true, true);
+
+OSCFunc.newMatching({|msg, time, addr, recvPort| msg.postln;}, '/rms', b); // path matching
+	

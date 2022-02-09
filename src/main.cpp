@@ -17,11 +17,6 @@ static bool testAction(int commandId, int flat){
   return true;
 }
 
-static std::string ADDRESS = "127.0.0.1";
-static int SEND_PORT = 8000;
-static int RECV_PORT = 8001;
-
-
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REAPER_PLUGIN_HINSTANCE instance, reaper_plugin_info_t *rec)
 {
@@ -40,12 +35,19 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(AudioAccessorValidateState, rec);
   REG_FUNC(DestroyAudioAccessor, rec);
+
   REG_FUNC(ShowConsoleMsg, rec);
+
   REG_FUNC(MoveEditCursor, rec);
   REG_FUNC(GetCursorPosition, rec);
   REG_FUNC(SetEditCurPos, rec);
   REG_FUNC(CSurf_OnZoom, rec);
   REG_FUNC(GetHZoomLevel, rec);
+  // includes the master track
+  REG_FUNC(GetSelectedTrack2, rec);
+  REG_FUNC(CountSelectedTracks2, rec);
+  REG_FUNC(GetMediaTrackInfo_Value, rec);
+
 
   // create controller
   OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);

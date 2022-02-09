@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <map>
 
+static std::string ADDRESS = "127.0.0.1";
+static int SEND_PORT = 8000;
+static int RECV_PORT = 8001;
+
 // return true if you successfully handled the message
 // and popped all the arguments
 using OSCCallback = std::function<void(oscpkt::Message&)>;
