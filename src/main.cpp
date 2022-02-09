@@ -46,6 +46,18 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(SetEditCurPos, rec);
   REG_FUNC(CSurf_OnZoom, rec);
   REG_FUNC(GetHZoomLevel, rec);
+  
+  // includes the master track
+  REG_FUNC(GetSelectedTrack2, rec);
+  REG_FUNC(CountSelectedTracks2, rec);
+
+  REG_FUNC(GetMediaTrackInfo_Value, rec);
+  REG_FUNC(GetSetMediaItemInfo, rec);
+  REG_FUNC(GetMediaItemInfo_Value, rec);
+
+  REG_FUNC(GetSelectedMediaItem, rec);
+  REG_FUNC(GetActiveTake, rec);
+  REG_FUNC(GetMediaItemTake_Peaks, rec);
 
   // create controller
   OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);

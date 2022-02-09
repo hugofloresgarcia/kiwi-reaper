@@ -1,5 +1,8 @@
 #include "reaper_plugin_functions.h"
 #include "osc.h"
+#include "include/json/json.hpp"
+
+#define project nullptr
 
 class OSCController : IReaperControlSurface {
   OSCController();
@@ -30,7 +33,8 @@ public:
     m_manager->add_callback("/move_edit_cursor",
     [](Msg& msg){
       float move_amt;
-      if (msg.arg().popFloat(move_amt).isOkNoMoreArgs()){
+      if (msg.arg().popFloat(move_amt)
+                   .isOkNoMoreArgs()){
         SetEditCurPos(
           GetCursorPosition() + (double)move_amt, 
           true, true
@@ -41,18 +45,54 @@ public:
     m_manager->add_callback("/zoom",
     [](Msg& msg){
       int xdir;
-      if (msg.arg().popInt32(xdir).isOkNoMoreArgs()){
+      if (msg.arg().popInt32(xdir)
+                   .isOkNoMoreArgs()){
         CSurf_OnZoom(xdir, 0);
       }
     });
 
-    // m_manager->add_callback("/get_amplitude_at_time", 
-    // [](Msg& msg){
-    //   float time;
-    //   if (msg.arg().popFloat(time)){
-    //     double pix_per_sec = GetHZoomLevel();
-    //   }
-    // });
+    m_manager->add_callback("/get_peaks", 
+    [this](Msg& msg){
+      float t0; int num_pixels;
+      if (!msg.arg().popFloat(t0)
+                   .popInt32(num_pixels)
+                   .isOkNoMoreArgs())
+        // TODO: log bad message;
+        { return; }
+        
+      // the first selected media item for now
+      MediaItem* item = GetSelectedMediaItem(project, 0);
+      if (!item) {return;} // TODO: LOG ME
+
+      MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
+      if (!track) {return;} // TODO: LOG ME
+
+      int num_channels = GetMediaTrackInfo_Value(track, "I_NCHAN");
+
+      // get the active take so we can look at it's peaks
+      MediaItem_Take* take = GetActiveTake(item);
+      if (!take) {return;} // TODO: LOG ME
+
+      // the peaks!
+      double pix_per_s = GetHZoomLevel();
+      std::vector<double> peaks(num_channels * num_pixels);
+
+      if (!GetMediaItemTake_Peaks(take, pix_per_s, t0, num_channels, 
+                                  num_pixels, 0, peaks.data()))
+          {return;} // TODO: log me
+
+      // put the peaks into json
+      json j;
+      j["peaks"] = peaks;
+      j["num_channels"] = num_channels;
+      j["num_pixels"] = num_pixels;
+      j["pix_per_s"] = pix_per_s;
+
+      // send!
+      oscpkt::Message reply;
+      reply.init("/peaks").pushStr(j.dump());
+      m_manager->send(reply);
+    });
   };
 
   // this runs about 30x per second. do all OSC polling here

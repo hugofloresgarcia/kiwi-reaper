@@ -43,6 +43,7 @@ set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME kiwi) # avoid an empty "Unspecified" co
 add_library(kiwi SHARED
     include/oscpkt/oscpkt.hh
     include/oscpkt/udp.hh
+    include/json/json.hpp
     src/controller.h
     src/osc.h
     src/main.cpp

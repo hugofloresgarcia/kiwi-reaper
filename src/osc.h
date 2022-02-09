@@ -1,6 +1,9 @@
 #include "include/oscpkt/oscpkt.hh"
 #include "include/oscpkt/udp.hh"
 
+#include "include/json/json.hpp"
+using json = nlohmann::json;
+
 #include <stdio.h>
 #include <map>
 

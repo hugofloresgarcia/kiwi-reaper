@@ -1,5 +1,6 @@
 // run me first
 b = NetAddr.new("127.0.0.1", 8001);
+r = NetAddr.new("127.0.0.1", 8000);
 
 // send a move edit cursor
 (
@@ -28,4 +29,20 @@ Routine({
 }).play;
 )
 
+// get waveform display for 720 pixels at a rate of 0.01
+(
+Routine({
+	72.do({
+		arg c;
+		b.sendMsg("/get_peaks", c.asFloat, 5);
+		0.1.wait;
+		c.post; 'sent'.postln;
+	});
+}).play;
+)
+
 OSCFunc.trace(true, true);
+
+OSCFunc.newMatching({|msg, time, addr, recvPort| msg.postln;}, '/rms', r); // path matching
+
+OSCdef(\test, {|msg, time, addr, recvPort| msg.postln}, '/rms', r); // def style
