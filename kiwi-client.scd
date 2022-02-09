@@ -32,7 +32,7 @@ Routine({
 // get waveform display for 720 pixels at a rate of 0.01
 (
 Routine({
-	72.do({
+	1.do({
 		arg c;
 		b.sendMsg("/get_peaks", c.asFloat, 5);
 		0.1.wait;

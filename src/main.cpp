@@ -58,6 +58,10 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(GetSelectedMediaItem, rec);
   REG_FUNC(GetActiveTake, rec);
   REG_FUNC(GetMediaItemTake_Peaks, rec);
+  REG_FUNC(GetMediaItemTake_Source, rec);
+  REG_FUNC(PCM_Source_GetPeaks, rec);
+  REG_FUNC(SetMediaItemTakeInfo_Value, rec);
+  REG_FUNC(SetMediaItemInfo_Value, rec);
 
   // create controller
   OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);
