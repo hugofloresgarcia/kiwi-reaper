@@ -1,26 +1,24 @@
+#include "controller.h"
+#include "reaper_plugin_functions.h"
+
+#include <cstdio>
 #include <iostream>
+#include <string>
+#include <utility>
 
 #define REAPERAPI_IMPLEMENT
 // automatically check if registered api call is valid 
 #define BAIL_IF_NO_REG(x) if (!x) { std::cerr<<"failed to register function "<<x<<std::endl; return 0; }
 #define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x) ; BAIL_IF_NO_REG(x) ;
 
-#include "reaper_plugin_functions.h"
-#include <cstdio>
-#include <string>
-#include <utility>
-
-#include "controller.h"
+static std::string ADDRESS = "127.0.0.1";
+static int SEND_PORT = 8000;
+static int RECV_PORT = 8001;
 
 static bool testAction(int commandId, int flat){
   ShowConsoleMsg("hello world!\n");
   return true;
 }
-
-static std::string ADDRESS = "127.0.0.1";
-static int SEND_PORT = 8000;
-static int RECV_PORT = 8001;
-
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REAPER_PLUGIN_HINSTANCE instance, reaper_plugin_info_t *rec)

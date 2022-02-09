@@ -1,5 +1,6 @@
 #include "include/oscpkt/oscpkt.hh"
 #include "include/oscpkt/udp.hh"
+#include "log.h"
 
 #include <stdio.h>
 #include <map>
@@ -33,9 +34,14 @@ public:
       while (reader.isOk() && (msg = reader.popMessage()) != 0) {
         for (const auto &pair : m_callbacks){
           // only call if pattern matches
-          if (msg->match(pair.first).isOk())
+          if (msg->match(pair.first).isOk()){
+            int i; std::string s;
+            msg->arg().popInt32(i).popStr(s);
+            LOG(s.c_str())
             pair.second(*msg);
+          }
         }
+
       }
     }
   }
@@ -45,6 +51,9 @@ public:
 
     oscpkt::PacketWriter writer;
     writer.init().addMessage(msg);
+    int i; std::string s;
+    msg.arg().popInt32(i).popStr(s);
+    LOG(s.c_str())
     return m_send_sock.sendPacket(writer.packetData(), writer.packetSize());
   }
 
