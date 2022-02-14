@@ -37,25 +37,27 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
     return 0;
 
   // register api functions that we want
-  REG_FUNC(CreateTrackAudioAccessor, rec);
-  REG_FUNC(GetAudioAccessorEndTime, rec);
-  REG_FUNC(GetAudioAccessorStartTime, rec);
-  REG_FUNC(GetAudioAccessorSamples, rec);
   REG_FUNC(AudioAccessorStateChanged, rec);
   REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(AudioAccessorValidateState, rec);
-  REG_FUNC(DestroyAudioAccessor, rec);
-  REG_FUNC(ShowConsoleMsg, rec);
-  REG_FUNC(MoveEditCursor, rec);
-  REG_FUNC(GetCursorPosition, rec);
-  REG_FUNC(SetEditCurPos, rec);
+  REG_FUNC(CreateTrackAudioAccessor, rec);
   REG_FUNC(CSurf_OnZoom, rec);
+  REG_FUNC(DestroyAudioAccessor, rec);
+  REG_FUNC(GetAudioAccessorEndTime, rec);
+  REG_FUNC(GetAudioAccessorStartTime, rec);
+  REG_FUNC(GetAudioAccessorSamples, rec);
+  REG_FUNC(GetCursorPosition, rec);
   REG_FUNC(GetHZoomLevel, rec);
-  
+  REG_FUNC(MoveEditCursor, rec);
+  REG_FUNC(ShowConsoleMsg, rec);
+  REG_FUNC(SetEditCurPos, rec);
+
   // includes the master track
   REG_FUNC(GetSelectedTrack2, rec);
   REG_FUNC(CountSelectedTracks2, rec);
 
+  REG_FUNC(GetMediaSourceNumChannels, rec);
+  REG_FUNC(GetMediaSourceSampleRate, rec);
   REG_FUNC(GetMediaTrackInfo_Value, rec);
   REG_FUNC(GetSetMediaItemInfo, rec);
   REG_FUNC(GetMediaItemInfo_Value, rec);
