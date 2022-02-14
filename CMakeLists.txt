@@ -44,6 +44,7 @@ add_library(kiwi SHARED
     include/oscpkt/oscpkt.hh
     include/oscpkt/udp.hh
     include/json/json.hpp
+    src/audio_pixel.h
     src/controller.h
     src/osc.h
     src/main.cpp

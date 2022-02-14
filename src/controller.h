@@ -1,6 +1,5 @@
 #include "reaper_plugin_functions.h"
 #include "osc.h"
-#include "include/json/json.hpp"
 
 #define project nullptr
 
@@ -89,8 +88,10 @@ public:
       int num_pixels = (int)((t1 - t0) * pix_per_s + 0.5);
       std::vector<double> peaks(num_channels * num_pixels * 3);
 
-      int peak_rv = PCM_Source_GetPeaks(source, pix_per_s, t0, num_channels, 
-                                  num_pixels, 115, peaks.data());
+      int peak_rv = PCM_Source_GetPeaks(source, pix_per_s, GetCursorPosition(), num_channels, 
+                                  0, 115, peaks.data());
+      // PCM_source_peaktransfer_t()
+      // CalculatePeaks();
       auto spl_cnt  = (peak_rv & 0xfffff);
       auto ext_type = (peak_rv & 0x1000000)>>24;
       auto out_mode = (peak_rv & 0xf00000)>>20;
