@@ -1,5 +1,10 @@
 #include <iostream>
 
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #define REAPERAPI_IMPLEMENT
 // automatically check if registered api call is valid 
 #define BAIL_IF_NO_REG(x) if (!x) { std::cerr<<"failed to register function "<<x<<std::endl; return 0; }
