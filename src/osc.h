@@ -1,6 +1,7 @@
 #include "include/oscpkt/oscpkt.hh"
 #include "include/oscpkt/udp.hh"
 
+#include <functional>
 #include <stdio.h>
 #include <map>
 
