@@ -1,4 +1,6 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
+#define NOMINMAX
+
 #include <iostream>
 #include <iterator>
 
@@ -25,8 +27,6 @@ private:
 class audio_pixel_t {
 public: 
     audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
-
-private:
     double m_max;
     double m_min;
     double m_rms;
@@ -47,46 +47,48 @@ public:
     void update(std::vector<double>& sample_buffer, int num_channels, int sample_rate) {
         // constructs an audio pixel block using interleaved sample buffer and num channels
         // clear the current set of audio pixels 
-        m_pixels.clear();
+        m_channel_pixels.clear();
 
-        // vectors to store each channels audio pixel data
-        std::vector<double> channel_max(num_channels);
-        std::vector<double> channel_min(num_channels);
-        std::vector<double> channel_rms(num_channels);
+        // initalize the m_channel_pixels to have empty audio pixel vectors
+        for (int i = 0; i < num_channels; i++) {
+            std::vector<audio_pixel_t> empty_pixel_vec;
+            m_channel_pixels.push_back(empty_pixel_vec);
+        }
 
-        // counter to help parse interleaved labels
-        int curr_channel = 0;
+        //calcualte the samples per audio pixel and initalize an audio pixel
+        int samples_per_pixel = m_pix_per_s * sample_rate;
+        audio_pixel_t curr_pixel = audio_pixel_t(0, -1, 0);
 
-        //calcualte the samples per audio pixel
-        int samples_per_pixel = (m_pix_per_s * sample_rate) * num_channels;
-        int current_sample_count = 1;
+        for (int channel= 0; channel < num_channels; channel++) {
+            int collected_samples = 0;
 
-        for (int i = 0; i < sample_buffer.size(); i++) {
-            double curr_sample = sample_buffer[i];
+            for (int i = 0; i < sample_buffer.size(); i += num_channels) { 
+                double curr_sample = sample_buffer[i];
 
-            // update each channels audio pixel data information
-            if (channel_max[curr_channel] < curr_sample)
-                channel_max[curr_channel] = curr_sample;
-            if (channel_min[curr_channel] > curr_sample)
-                channel_min[curr_channel] = curr_sample;
-            channel_rms[curr_channel] += curr_sample * curr_sample;
+                // increment collected samples after creating new audio pixel 
+                collected_samples ++;
+        
+                // update all fields of the current pixeld based on the current sample
+                curr_pixel.m_max = std::max(curr_pixel.m_max, curr_sample);
+                curr_pixel.m_min = std::min(curr_pixel.m_min, curr_sample);
+                curr_pixel.m_rms += (curr_sample * curr_sample);
 
-            curr_channel = (curr_channel + 1) % num_channels;
-            if ((current_sample_count % samples_per_pixel) == 0) {
-                // create audio pixels for each channel
-                for (int i = 0; i < num_channels; i++) {
-                    m_pixels.push_back(audio_pixel_t(channel_max[i], channel_min[i], channel_rms[i] / sample_rate));
+                if ((collected_samples % samples_per_pixel) == 0) {
+                    // complete the RMS calculation, this method accounts of edge cases (total sample % samples per pixel != 0)
+                    curr_pixel.m_rms = curr_pixel.m_rms / collected_samples;
+
+                    // add the curr pixel to its channel in m_channel_pixels, clear curr_pixel
+                    m_channel_pixels[channel].push_back(curr_pixel);
+
+                    // set max to equal reaper min, and min to equal reaper max
+                    curr_pixel = audio_pixel_t(DBL_MIN, DBL_MAX, 0);
                 }
-                // zero out the vectors used to collect information about audio pixels for channels
-                std::fill(channel_max.begin(), channel_max.end(), 0);
-                std::fill(channel_min.begin(), channel_min.end(), 0);
-                std::fill(channel_rms.begin(), channel_rms.end(), 0);
             }
         }
     }
     bool flush() const { /*TODO*/ }; // flush contents to file
 
-    const std::vector<audio_pixel_t>& get_pixels() const { return m_pixels; }
+    const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; }
     const std::vector<audio_pixel_t>& get_pixels(double t0, double t1) const { /* TODO */}
 
     // serialization and deserialization
@@ -95,7 +97,7 @@ public:
 
 private: 
     double m_pix_per_s {1.0}; // pixels per second
-    std::vector<audio_pixel_t> m_pixels;  // stores pixel data
+    std::vector<std::vector<audio_pixel_t>> m_channel_pixels; // maps a channel to its corresponding representation 
     std::string m_guid; // unique id that maps back to a MediaItemTake
                         // use GetSetMediaItemTakeInfo_String to fill it up
 };
@@ -135,14 +137,13 @@ class audio_pixel_mipmap_t {
             int samples_per_channel = sample_rate * (accessor_end_time - accessor_start_time);
 
             // samples stored in sample_buffer, operation status is returned
-            int get_samples_status = GetAudioAcessorSamples(safe_accessor, sample_rate, num_channels,
-                accessor_start_time, samples_per_channel, sample_buffer.data());
-            if (get_samples_status != 1) { return; } // TODO: LOG ME
+            if (!GetAudioAcessorSamples(safe_accessor, sample_rate, num_channels, accessor_start_time, samples_per_channel, sample_buffer.data())) { 
+                return;  
+            } // TODO: LOG ME
 
             // pass samples to update audio pixel blocks
-            std::map<int, audio_pixel_block_t>::iterator it;
-            for (it = m_blocks.begin(); it != m_blocks.end(); it++) {
-                it->second.update(sample_buffer, num_channels, sample_rate);
+            for (auto& it: m_blocks) {
+                it.second.update(sample_buffer, num_channels, sample_rate);
             };
         }
     }
@@ -154,5 +155,5 @@ class audio_pixel_mipmap_t {
 private:
     MediaItemTake* m_take {nullptr};
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_Take
-    std::map<int, audio_pixel_block_t> m_blocks;
+    std::map<int, audio_pixel_block_t> m_blocks;  
 };
