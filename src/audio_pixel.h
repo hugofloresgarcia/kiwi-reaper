@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <iterator>
+#include <math.h>
 
 #include "include/json/json.hpp"
 #include "reaper_plugin_functions.h"
@@ -27,9 +28,10 @@ private:
 class audio_pixel_t {
 public: 
     audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
-    double m_max;
-    double m_min;
-    double m_rms;
+    audio_pixel_t() {};
+    double m_max{ DBL_MIN };
+    double m_min { DBL_MAX };
+    double m_rms {0};
 
 public:
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(audio_pixel_t, m_max, m_min, m_rms);
@@ -42,7 +44,7 @@ class audio_pixel_block_t {
 public: 
     audio_pixel_block_t(double pix_per_s)
         :m_pix_per_s(pix_per_s) {};
-    audio_pixel_block_t(double pix_per_s, std::vector<std::vector<audio_pixel_t>> channel_pixels;)
+    audio_pixel_block_t(double pix_per_s, std::vector<std::vector<audio_pixel_t>> channel_pixels)
         :m_pix_per_s(pix_per_s), m_channel_pixels(channel_pixels) {};
     ~audio_pixel_block_t() {};
 
@@ -107,8 +109,6 @@ public:
 
     const int get_pps() {return m_pix_per_s;}
 
-    const int num_samp
-
     // serialization and deserialization
     void to_json(json& j) const;
     void from_json(const json& j);
@@ -169,21 +169,24 @@ class audio_pixel_mipmap_t {
     bool flush() const; // flush all blocks to disk
 
     // mm, how do we pass these pixels fast enough?
-    std::vector<audio_pixel_t> get_pixels(double t0, double t1, double pix_per_s) {
-        // start by grabbing pixels from the nearest two pixel blocks
-        nearest_pps = get_two_nearest_pps(pix_per_s);
+    audio_pixel_block_t get_pixels(double t0, double t1, double pix_per_s) {
+        // start by grabbing pixels from the nearest two pixel blocks TODO: this will be a vector<double>
+        double nearest_pps = get_two_nearest_pps(pix_per_s);
 
         if (nearest_pps == pix_per_s) // last edge case, when hte given pps is already a block
             return m_blocks[nearest_pps];
 
         // perform interpolation
         audio_pixel_block_t interpolated_block = interpolate_block(t0, t1, pix_per_s, nearest_pps);
+        return interpolated_block;
     };
 
     double get_two_nearest_pps(double pix_per_s) {
         // TODO: make this a vector of doubles, return the two nearest pps
         // returning the nearest to first get bilinear interpolation working
         // 2 edge cases
+        int n_blocks = m_block_pps.size();
+
         if (pix_per_s <= m_block_pps[0]) // given pps smaller than our smallest rep
             return m_block_pps[0];
         else if (pix_per_s >= m_block_pps[n_blocks - 1]) // given pps larger than our largest rep
@@ -195,7 +198,7 @@ class audio_pixel_mipmap_t {
     double get_nearest_block_pps(double pix_per_s) {
         // returns the nearest blocks for a given pixels per seconds
         // also notifies caller if the given nearest block is an edge case (first/last element)
-        int n_blocks = m_block_pps.size()
+        int n_blocks = m_block_pps.size();
 
         // binary search the list 
         int low = 0, high = n_blocks, mid = 0;
@@ -203,7 +206,7 @@ class audio_pixel_mipmap_t {
         while (low < high) {
             // update mid
             mid = (low + high)/2;
-            mid_val = m_block_pps[mid];
+            double mid_val = m_block_pps[mid];
 
             // edge case, a block with the given pps is already saved
             if (mid_val == pix_per_s)
@@ -211,13 +214,13 @@ class audio_pixel_mipmap_t {
             
             // the given pps is less than the current mid
             if (pix_per_s < mid_val) {
-                if (mid > 0 && target > m_block_pps[mid - 1])
+                if (mid > 0 && pix_per_s > m_block_pps[mid - 1])
                     return closet_val(m_block_pps[mid - 1], mid_val, pix_per_s);
                 high = mid;
             }
 
             else {
-                if (mid < n - 1 && pix_per_s < m_block_pps[mid + 1])
+                if (mid < n_blocks - 1 && pix_per_s < m_block_pps[mid + 1])
                     return closet_val(mid_val, m_block_pps[mid + 1], pix_per_s);
                 low = mid + 1;
             }
@@ -226,13 +229,12 @@ class audio_pixel_mipmap_t {
         return m_block_pps[mid];
     }
 
-    double closet_val(val1, val2, target) {
+    double closet_val(double val1, double val2, double target) {
         // val 1 must be greater than val 2
-        if (target - val1 >= val2 - target) {
+        if (target - val1 >= val2 - target)
             return val2;
-        else 
-            return val1
-        }
+        else
+            return val1;
     }
 
     audio_pixel_block_t interpolate_block(double t0, double t1, double new_pps, double nearest_pps) {
@@ -243,22 +245,45 @@ class audio_pixel_mipmap_t {
         int new_number_pixels = (int)round((t1 - t0) * new_pps);
 
         double new_t_unit = 1/new_pps, nearest_t_unit = 1/nearest_pps; // new/nearest block's time unit (the time between pixels)
-        double nearest_t1 = 0, nearest_t2 = nearest_t_unit, nearest_t_idx1 = 0, nearest_t_idx2 = 1; // nearest block's time range and index (position in time of nearest samples)
-        double curr_new_t = 0; // new block's time 
+        double nearest_t0 = 0, nearest_t1 = nearest_t_unit; // nearest block's time range and index (position in time of nearest samples)
+        audio_pixel_t nearest_pixel0, nearest_pixel1;
+        int nearest_pixel_idx0 = 0, nearest_pixel_idx1 = 1; 
+        double curr_t = 0; // new block's time 
+
+        std::vector<std::vector<audio_pixel_t>> new_block;
 
         for (auto& nearest_pixels : nearest_channel_pixels) {
             // nearest pixels of the specfic channel 
-            for (int i = 0; i < new_number_pixels; i++) {
-                curr_new_t = i * new_t_unit;
+            audio_pixel_t curr_audio_pixel;
+            std::vector<audio_pixel_t> curr_channel_pixels;
 
-                if (closet_val(nearest_t2, nearest_t2 + nearest_t_unit, curr_new_t)) {
-                    nearest_t1 += nearest_t_unit;
-                    nearest_t2 += nearest_t_unit;
-                    nearest_t_idx1++;
-                    nearest_t_idx2++;
-                }
+            for (int i = 0; i < new_number_pixels; i++) {
+                curr_t = i * new_t_unit;
+                curr_audio_pixel = audio_pixel_t();
+                
+                // grab the nearest audio pixels and their times
+                nearest_pixel_idx0 = floor(nearest_pps * curr_t);
+                nearest_pixel_idx1 = ceil(nearest_pps * curr_t);
+                nearest_t0 = nearest_pixel_idx0 * nearest_t_unit;
+                nearest_t1 = nearest_t0 + nearest_t_unit;
+                nearest_pixel0 = nearest_pixels[nearest_pixel_idx0];
+                nearest_pixel1 = nearest_pixels[nearest_pixel_idx0];
+
+                // perform liner interpolation for each field of the audio pixel
+                curr_audio_pixel.m_max = linear_interp(curr_t, nearest_t0, nearest_t1, nearest_pixel0.m_max, nearest_pixel0.m_max);
+                curr_audio_pixel.m_min = linear_interp(curr_t, nearest_t0, nearest_t1, nearest_pixel0.m_min, nearest_pixel0.m_min);
+                curr_audio_pixel.m_rms = linear_interp(curr_t, nearest_t0, nearest_t1, nearest_pixel0.m_rms, nearest_pixel0.m_rms);
+
+                curr_channel_pixels.push_back(curr_audio_pixel);
             }
+            new_block.push_back(curr_channel_pixels);
         }
+        return audio_pixel_block_t(new_pps, new_block);
+    }
+
+    double linear_interp(double x, double x1, double x2, double y1, double y2) {
+        // interpolation in time domain
+        return (((x2 - x) / (x2 - x1)) * y1) + ((x - x1) / (x2 - x1)) * y2;
     }
 
 private:
@@ -272,4 +297,4 @@ struct cmp_blocks_pps {
     bool operator()(const double& a, const double& b) {
         return a < b;
     }
-}
+};
