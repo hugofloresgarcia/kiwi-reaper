@@ -4,17 +4,23 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #endif
+
+#include <functional>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <math.h>
 
 #include "include/json/json.hpp"
-
 #include "reaper_plugin_functions.h"
 #include "reaper_plugin.h"
 
 
 using json = nlohmann::json;
+
+// forward declarations
+double linear_interp(double x, double x1, double x2, double y1, double y2);
+double closest_val(double val1, double val2, double target);
 
 class safe_audio_accessor_t {
 public:
@@ -36,9 +42,18 @@ class audio_pixel_t {
 public: 
     audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
     audio_pixel_t() {};
-    double m_max{ DBL_MIN };
-    double m_min { DBL_MAX };
-    double m_rms {0};
+
+    void linear_interpolation(double t, double t0, double t1, audio_pixel_t p0, audio_pixel_t p1){
+        // updates current pixels fields based on linear interpolation from 
+        // pixels' 1 and 2. 
+        m_max = linear_interp(t, t0, t1, p0.m_max, p1.m_max);
+        m_min = linear_interp(t, t0, t1, p0.m_min, p1.m_min);
+        m_rms = linear_interp(t, t0, t1, p0.m_rms, p1.m_rms);
+    }
+
+    double m_max{ std::numeric_limits<double>::lowest()  };
+    double m_min { std::numeric_limits<double>::max() };
+    double m_rms { 0 };
 
 public:
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(audio_pixel_t, m_max, m_min, m_rms);
@@ -101,25 +116,19 @@ class audio_pixel_mipmap_t {
     bool flush() const; // flush all blocks to disk
 
     // mm, how do we pass these pixels fast enough?
-    audio_pixel_block_t get_pixels(double t0, double t1, double pix_per_s);
+    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, double pix_per_s);
 
     void update();
 
 private:
-    double closet_val(double val1, double val2, double target);
-    double get_nearest_block_pps(double pix_per_s);
+    double closest_val(double val1, double val2, double target);
+    void fill_blocks();
     double get_nearest_pps(double pix_per_s);
-    audio_pixel_block_t interpolate_block(double t0, double t1, double new_pps, double nearest_pps);
-    double linear_interp(double x, double x1, double x2, double y1, double y2);
+    double get_nearest_pps_helper(double pix_per_s);
+    audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps, double t0, double t1);
     
     MediaTrack* m_track {nullptr};
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
-    std::map<double, audio_pixel_block_t> m_blocks;  
+    std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;  
     std::vector<double> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
-};
-
-struct cmp_blocks_pps {
-    bool operator()(const double& a, const double& b) {
-        return a < b;
-    }
 };
