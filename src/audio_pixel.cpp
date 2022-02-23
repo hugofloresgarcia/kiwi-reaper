@@ -1,4 +1,5 @@
 #include "audio_pixel.h"
+#define project nullptr
 
 // ************* audio_pixel_block_t ****************
 
@@ -152,7 +153,7 @@ void audio_pixel_mipmap_t::update() {
     // due to reaper api calls: AudioAccessorUpdate
     AudioAccessor* safe_accessor = m_accessor.get();
 
-    if (AudioAcessorStateChange(safe_accessor)) {
+    if (AudioAccessorStateChanged(safe_accessor)) {
         // updates the audio acessors contents
         AudioAccessorUpdate(safe_accessor);
 
@@ -160,8 +161,13 @@ void audio_pixel_mipmap_t::update() {
         double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
         double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
 
+        MediaItem* item = GetSelectedMediaItem(project, 0);
+        if (!item) {return;} // TODO: LOG ME
+        MediaItem_Take* take = GetActiveTake(item);
+        if (!take) {return;} // TODO: LOG ME
+
         // retrive the takes sample rate and num channels from PCM source
-        PCM_source* source = GetMediaItemTake_Source(m_take);
+        PCM_source* source = GetMediaItemTake_Source(take);
         if (!source) { return; } // TODO: LOG ME
         int sample_rate = GetMediaSourceSampleRate(source);
         int num_channels = GetMediaSourceNumChannels(source);
@@ -171,7 +177,7 @@ void audio_pixel_mipmap_t::update() {
         int samples_per_channel = sample_rate * (accessor_end_time - accessor_start_time);
 
         // samples stored in sample_buffer, operation status is returned
-        if (!GetAudioAcessorSamples(safe_accessor, sample_rate, num_channels, accessor_start_time, samples_per_channel, sample_buffer.data())) {
+        if (!GetAudioAccessorSamples(safe_accessor, sample_rate, num_channels, accessor_start_time, samples_per_channel, sample_buffer.data())) {
             return;
         } // TODO: LOG ME
 

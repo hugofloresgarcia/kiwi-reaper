@@ -1,21 +1,26 @@
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
-#define NOMINMAX
-#define REAPERAPI_IMPLEMENT
 
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <iostream>
 #include <iterator>
 #include <math.h>
 
 #include "include/json/json.hpp"
+
 #include "reaper_plugin_functions.h"
+#include "reaper_plugin.h"
+
 
 using json = nlohmann::json;
 
 class safe_audio_accessor_t {
 public:
     // must check that accessor was created with is_valid()
-    safe_audio_accessor_t(MediaItem_Take* take) : m_accessor(CreateTrackAudioAcessor(take)) {};
-    ~safe_audio_accessor_t() { if(m_accessor) { DestroyTrackAudioAccessor(m_accessor); } };
+    safe_audio_accessor_t(MediaTrack* take) : m_accessor(CreateTrackAudioAccessor(take)) {};
+    ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
 
     AudioAccessor* get() { return m_accessor; };
     bool is_valid() { return m_accessor; };
@@ -44,6 +49,7 @@ public:
 class audio_pixel_block_t {
 
 public: 
+    audio_pixel_block_t() {};
     audio_pixel_block_t(double pix_per_s)
         :m_pix_per_s(pix_per_s) {};
     audio_pixel_block_t(double pix_per_s, std::vector<std::vector<audio_pixel_t>> channel_pixels)
@@ -66,7 +72,7 @@ public:
         return 0;
     }
     const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; }
-    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1) const { /* TODO */}
+    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1) const { return m_channel_pixels; } //TODO RETURN FOR REGIONS
     double get_pps() { return m_pix_per_s; }
 
 
@@ -85,9 +91,9 @@ private:
 // and is able to interpolate between them to 
 // get audio pixels at any resolution inbetween
 class audio_pixel_mipmap_t {
-    audio_pixel_mipmap_t(MediaItem_Take* take)
-        :m_accessor(safe_audio_accessor_t(take)),
-        m_take(take)
+    audio_pixel_mipmap_t(MediaTrack* track)
+        :m_accessor(safe_audio_accessor_t(track)),
+        m_track(track)
     {
         if (!m_accessor.is_valid()) { std::cerr << "Invalid audio accessor used for audio block." << std::endl; }
     };
@@ -106,8 +112,8 @@ private:
     audio_pixel_block_t interpolate_block(double t0, double t1, double new_pps, double nearest_pps);
     double linear_interp(double x, double x1, double x2, double y1, double y2);
     
-    MediaItemTake* m_take {nullptr};
-    safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_Take
+    MediaTrack* m_track {nullptr};
+    safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
     std::map<double, audio_pixel_block_t> m_blocks;  
     std::vector<double> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
 };
