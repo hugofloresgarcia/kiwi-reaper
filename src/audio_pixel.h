@@ -5,11 +5,14 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include <format>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <iterator>
 #include <limits>
 #include <math.h>
+#include <string>
 
 #include "include/json/json.hpp"
 #include "reaper_plugin_functions.h"
@@ -71,11 +74,6 @@ public:
         :m_pix_per_s(pix_per_s), m_channel_pixels(channel_pixels) {};
     ~audio_pixel_block_t() {};
 
-    bool flush() const { /*TODO*/ }; // flush contents to file
-    // serialization and deserialization
-    void to_json(json& j) const;
-    void from_json(const json& j);
-
     const int get_mono_pixel_count() {
         if (m_channel_pixels.size() > 0)
             return m_channel_pixels[0].size();
@@ -113,7 +111,10 @@ class audio_pixel_mipmap_t {
         if (!m_accessor.is_valid()) { std::cerr << "Invalid audio accessor used for audio block." << std::endl; }
     };
 
-    bool flush() const; // flush all blocks to disk
+    bool flush() const { /*TODO*/ }; // flush contents to file
+    // serialization and deserialization
+    void to_json(json& j) const;
+    void from_json(const json& j);
 
     // mm, how do we pass these pixels fast enough?
     const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, double pix_per_s);

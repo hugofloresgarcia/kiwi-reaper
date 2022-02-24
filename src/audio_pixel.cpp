@@ -145,6 +145,25 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(double src_p
     return prev_block_val;
 }
 
+bool audio_pixel_mipmap_t::flush() const {
+    json j;
+    to_json(j);
+    std::string resource_path = GetResourcePath();
+    std::ofstream ofs;
+    ofs.open(resource_path);
+    if (!ofs.is_open())
+        return false;
+    
+    ofs << j << std::endl;
+    return true;
+}
+
+void audio_pixel_mipmap_t::to_json(json& j) const {
+    for (auto& map_entry : m_blocks) {
+        j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
+    }
+}
+
 void audio_pixel_mipmap_t::update() {
     // update all blocks
     // MUST BE CALLED BY MAIN THREAD
