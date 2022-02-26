@@ -1,5 +1,7 @@
-#include "reaper_plugin_functions.h"
+#include "audio_pixel.h"
 #include "osc.h"
+
+#include "reaper_plugin_functions.h"
 
 #define project nullptr
 
@@ -50,67 +52,56 @@ public:
       }
     });
 
-    m_manager->add_callback("/get_peaks", 
-    [this](Msg& msg){
-      float t0; float t1;
-      if (!msg.arg().popFloat(t0)
-                   .popFloat(t1)
-                   .isOkNoMoreArgs())
-        // TODO: log bad message;
-        { return; }
+    // m_manager->add_callback("/get_peaks", 
+    // [this](Msg& msg){
+    //   float t0; float t1;
+    //   if (!msg.arg().popFloat(t0)
+    //                .popFloat(t1)
+    //                .isOkNoMoreArgs())
+    //     // TODO: log bad message;
+    //     { return; }
         
-      // the first selected media item for now
-      MediaItem* item = GetSelectedMediaItem(project, 0);
+    //   // the first selected media item for now
+    //   MediaItem* item = GetSelectedMediaItem(project, 0);
+    //   if (!item) {return;} // TODO: LOG ME
+
+    //   MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
+    //   if (!track) {return;} // TODO: LOG ME
+
+    //   // {return;} // TODO: log me
+
+    //   // // put the peaks into json
+    //   // json j;
+    //   // j["peaks"] = peaks;
+    //   // j["num_channels"] = num_channels;
+    //   // j["num_pixels"] = num_pixels;
+    //   // j["pix_per_s"] = pix_per_s;
+
+    //   // // send!
+    //   // oscpkt::Message reply;
+    //   // reply.init("/peaks").pushStr(j.dump());
+    //   // m_manager->send(reply);
+    // });
+
+    m_manager->add_callback("/init",
+    [this](Msg& msg){
+      // // the first selected media item for now
+      MediaItem* item = GetSelectedMediaItem(0, 0);
       if (!item) {return;} // TODO: LOG ME
-
-      // crop t0 and t1 to the media item's bounds
-      // TODO: make t0 and t1 doubles from the begging to avoid casting down.
-      t0 = std::max(t0, (float)*(double*)GetSetMediaItemInfo(item, "D_POSITION", nullptr));
-      t1 = std::min(t1, (float)*(double*)GetSetMediaItemInfo(item, "D_LENGTH", nullptr));
-
-      if (t0 >= t1) {return;} // TODO: LOG ME
-
+      // MediaItem_Take* take = GetActiveTake(item);
+      // AudioAccessor* accessor = CreateTakeAudioAccessor(take);
       MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-      if (!track) {return;} // TODO: LOG ME
-
-      // int num_channels = GetMediaTrackInfo_Value(track, "I_NCHAN");
-      int num_channels = 1;
-
-      // get the active take so we can look at it's peaks
-      MediaItem_Take* take = GetActiveTake(item);
-      if (!take) {return;} // TODO: LOG ME
-
-      PCM_source* source = GetMediaItemTake_Source(take);
-      if (!source) {return;} // TODO: LOG ME
-
-      // the peaks!
-      double pix_per_s = GetHZoomLevel();
-      int num_pixels = (int)((t1 - t0) * pix_per_s + 0.5);
-      std::vector<double> peaks(num_channels * num_pixels * 3);
-
-      int peak_rv = PCM_Source_GetPeaks(source, pix_per_s, GetCursorPosition(), num_channels, 
-                                  0, 115, peaks.data());
-      // PCM_source_peaktransfer_t()
-      // CalculatePeaks();
-      auto spl_cnt  = (peak_rv & 0xfffff);
-      auto ext_type = (peak_rv & 0x1000000)>>24;
-      auto out_mode = (peak_rv & 0xf00000)>>20;
+      std::vector<int> resolutions = {41000, 20500, 10250, 5125, 2561, 1280, 639};
+      m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
+      //bool status = m_mipmap->flush();
+      audio_pixel_block_t interpolated_block = m_mipmap->get_block(3000);
+      interpolated_block.flush();
+      // const char* status_msg = "Flush Status: " + status;
+      // ShowConsoleMsg(status_msg);
+    } 
 
 
-          // {return;} // TODO: log me
-
-      // // put the peaks into json
-      // json j;
-      // j["peaks"] = peaks;
-      // j["num_channels"] = num_channels;
-      // j["num_pixels"] = num_pixels;
-      // j["pix_per_s"] = pix_per_s;
-
-      // // send!
-      // oscpkt::Message reply;
-      // reply.init("/peaks").pushStr(j.dump());
-      // m_manager->send(reply);
-    });
+    );
   };
 
   // this runs about 30x per second. do all OSC polling here
@@ -121,4 +112,5 @@ public:
 
 private:
   std::unique_ptr<OSCManager> m_manager {nullptr};
+  std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
 };

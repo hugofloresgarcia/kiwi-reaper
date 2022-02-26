@@ -18,6 +18,15 @@ Routine({
 }).play;
 )
 
+// init
+(
+Routine({
+	1.do({
+		b.sendMsg("/init", -1);
+		1.wait;
+	});
+}).play;
+)
 
 // zoom
 (

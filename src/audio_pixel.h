@@ -12,6 +12,7 @@
 #include <iterator>
 #include <limits>
 #include <math.h>
+#include <memory>
 #include <string>
 
 #include "include/json/json.hpp"
@@ -28,7 +29,12 @@ double closest_val(double val1, double val2, double target);
 class safe_audio_accessor_t {
 public:
     // must check that accessor was created with is_valid()
-    safe_audio_accessor_t(MediaTrack* take) : m_accessor(CreateTrackAudioAccessor(take)) {};
+    //m_accessor(CreateTrackAudioAccessor(take))
+    safe_audio_accessor_t(MediaTrack* track){
+        // getting the source
+        m_accessor = CreateTrackAudioAccessor(track);
+    };
+    safe_audio_accessor_t(AudioAccessor* accessor) : m_accessor(accessor){};
     ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
 
     AudioAccessor* get() { return m_accessor; };
@@ -87,8 +93,8 @@ public:
     const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; }
     const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1) const { return m_channel_pixels; } //TODO RETURN FOR REGIONS
     double get_pps() { return m_pix_per_s; }
-
-
+    bool flush() const; 
+    void to_json(json& j) const;
     void update(std::vector<double>& sample_buffer, int num_channels, int sample_rate);
 
 
@@ -96,7 +102,7 @@ public:
 private: 
     std::vector<std::vector<audio_pixel_t>> m_channel_pixels; // vector of audio_pixels for each channel 
     std::string m_guid; // unique-id mapping back to a MediaItemTake, fill w/ GetSetMediaItemTakeInfo_String 
-    double m_pix_per_s {1.0}; // pixels per second
+    int m_pix_per_s {1}; // pixels per second
 
 };
 
@@ -104,32 +110,40 @@ private:
 // and is able to interpolate between them to 
 // get audio pixels at any resolution inbetween
 class audio_pixel_mipmap_t {
-    audio_pixel_mipmap_t(MediaTrack* track)
+public:
+    audio_pixel_mipmap_t(MediaTrack* track, std::vector<int> resolutions)
         :m_accessor(safe_audio_accessor_t(track)),
         m_track(track)
     {
         if (!m_accessor.is_valid()) { std::cerr << "Invalid audio accessor used for audio block." << std::endl; }
+        for (double res : resolutions) {
+            m_blocks[res] = audio_pixel_block_t(res);
+        }
+        m_block_pps = resolutions;
+        std::sort(m_block_pps.begin(), m_block_pps.end());
+        fill_blocks();
     };
 
-    bool flush() const { /*TODO*/ }; // flush contents to file
+    bool flush() const; // flush contents to file
     // serialization and deserialization
     void to_json(json& j) const;
     void from_json(const json& j);
 
     // mm, how do we pass these pixels fast enough?
-    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, double pix_per_s);
+    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, int pix_per_s);
+    audio_pixel_block_t get_block(int pix_per_s);
 
     void update();
 
 private:
-    double closest_val(double val1, double val2, double target);
+    int closest_val(double val1, double val2, double target);
     void fill_blocks();
-    double get_nearest_pps(double pix_per_s);
-    double get_nearest_pps_helper(double pix_per_s);
-    audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps, double t0, double t1);
+    int get_nearest_pps(int pix_per_s);
+    int get_nearest_pps_helper(int pix_per_s);
+    audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, double t0, double t1);
     
     MediaTrack* m_track {nullptr};
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
-    std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;  
-    std::vector<double> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
+    std::map<int, audio_pixel_block_t, std::greater<int>> m_blocks;  
+    std::vector<int> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
 };

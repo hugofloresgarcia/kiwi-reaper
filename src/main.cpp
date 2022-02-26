@@ -40,6 +40,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(AudioAccessorStateChanged, rec);
   REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(AudioAccessorValidateState, rec);
+  REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(CreateTrackAudioAccessor, rec);
   REG_FUNC(CSurf_OnZoom, rec);
   REG_FUNC(DestroyAudioAccessor, rec);
@@ -56,6 +57,8 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   // includes the master track
   REG_FUNC(GetSelectedTrack2, rec);
   REG_FUNC(CountSelectedTracks2, rec);
+  REG_FUNC(CountSelectedMediaItems, rec);
+  REG_FUNC(GetSetProjectInfo, rec);
 
   REG_FUNC(GetMediaSourceNumChannels, rec);
   REG_FUNC(GetMediaSourceSampleRate, rec);
@@ -67,6 +70,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(GetActiveTake, rec);
   REG_FUNC(GetMediaItemTake_Peaks, rec);
   REG_FUNC(GetMediaItemTake_Source, rec);
+  REG_FUNC(GetMediaItem_Track, rec);
   REG_FUNC(PCM_Source_GetPeaks, rec);
   REG_FUNC(SetMediaItemTakeInfo_Value, rec);
   REG_FUNC(SetMediaItemInfo_Value, rec);
