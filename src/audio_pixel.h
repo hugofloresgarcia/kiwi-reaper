@@ -19,7 +19,6 @@
 #include "reaper_plugin_functions.h"
 #include "reaper_plugin.h"
 
-
 using json = nlohmann::json;
 
 // forward declarations
@@ -28,6 +27,7 @@ double closest_val(double val1, double val2, double target);
 
 class safe_audio_accessor_t {
 public:
+    ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
     // must check that accessor was created with is_valid()
     //m_accessor(CreateTrackAudioAccessor(take))
     safe_audio_accessor_t(MediaTrack* track){
@@ -35,7 +35,7 @@ public:
         m_accessor = CreateTrackAudioAccessor(track);
     };
     safe_audio_accessor_t(AudioAccessor* accessor) : m_accessor(accessor){};
-    ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
+    
 
     AudioAccessor* get() { return m_accessor; };
     bool is_valid() { return m_accessor; };
@@ -60,7 +60,7 @@ public:
         m_rms = linear_interp(t, t0, t1, p0.m_rms, p1.m_rms);
     }
 
-    double m_max{ std::numeric_limits<double>::lowest()  };
+    double m_max{ std::numeric_limits<double>::lowest() };
     double m_min { std::numeric_limits<double>::max() };
     double m_rms { 0 };
 
@@ -71,7 +71,6 @@ public:
 // stores one block of mipmapped audio data, at a particular sample rate
 // should be able to update when the samples are updated
 class audio_pixel_block_t {
-
 public: 
     audio_pixel_block_t() {};
     audio_pixel_block_t(double pix_per_s)
@@ -129,7 +128,7 @@ public:
     void to_json(json& j) const;
     void from_json(const json& j);
 
-    // mm, how do we pass these pixels fast enough?
+    // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
     const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, int pix_per_s);
     audio_pixel_block_t get_block(int pix_per_s);
 
