@@ -19,8 +19,8 @@ template<typename T>
 const std::vector<T> get_view(std::vector<T> const &parent, int start, int end)
 {
     // todo: make sure start and  end indices are valid
-    auto startptr = v.cbegin() + start;
-    auto endptr = v.cbegin() + end;
+    auto startptr = parent.cbegin() + start;
+    auto endptr = parent.cbegin() + end;
  
     std::vector<T> vec(startptr, endptr);
     return vec;
