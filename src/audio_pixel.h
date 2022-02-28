@@ -5,7 +5,6 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
