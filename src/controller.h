@@ -52,54 +52,19 @@ public:
       }
     });
 
-    // m_manager->add_callback("/get_peaks", 
-    // [this](Msg& msg){
-    //   float t0; float t1;
-    //   if (!msg.arg().popFloat(t0)
-    //                .popFloat(t1)
-    //                .isOkNoMoreArgs())
-    //     // TODO: log bad message;
-    //     { return; }
-        
-    //   // the first selected media item for now
-    //   MediaItem* item = GetSelectedMediaItem(project, 0);
-    //   if (!item) {return;} // TODO: LOG ME
-
-    //   MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-    //   if (!track) {return;} // TODO: LOG ME
-
-    //   // {return;} // TODO: log me
-
-    //   // // put the peaks into json
-    //   // json j;
-    //   // j["peaks"] = peaks;
-    //   // j["num_channels"] = num_channels;
-    //   // j["num_pixels"] = num_pixels;
-    //   // j["pix_per_s"] = pix_per_s;
-
-    //   // // send!
-    //   // oscpkt::Message reply;
-    //   // reply.init("/peaks").pushStr(j.dump());
-    //   // m_manager->send(reply);
-    // });
-
     m_manager->add_callback("/init",
     [this](Msg& msg){
       // // the first selected media item for now
       MediaItem* item = GetSelectedMediaItem(0, 0);
       if (!item) {return;} // TODO: LOG ME
-      // MediaItem_Take* take = GetActiveTake(item);
-      // AudioAccessor* accessor = CreateTakeAudioAccessor(take);
+
       MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-      std::vector<int> resolutions = {41000, 20500, 10250, 5125, 2561, 1280, 639, 315, 107};
+      std::vector<int> resolutions = {41000, 10250, 2561, 639, 107};
       m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
-      //bool status = m_mipmap->flush();
-      // audio_pixel_block_t interpolated_block = m_mipmap->get_block(3000);
-      // interpolated_block.flush();
+
+      // audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(10, -1, 300);
       audio_pixel_block_t interpolated_block = m_mipmap->get_block(300);
       interpolated_block.flush();
-      // const char* status_msg = "Flush Status: " + status;
-      // ShowConsoleMsg(status_msg);
     } 
 
 

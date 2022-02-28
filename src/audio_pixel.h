@@ -26,16 +26,10 @@ double linear_interp(double x, double x1, double x2, double y1, double y2);
 double closest_val(double val1, double val2, double target);
 
 class safe_audio_accessor_t {
+// wrapper of an audio accessor to prevent seg faults
 public:
+    safe_audio_accessor_t(MediaTrack* track) : m_accessor(CreateTrackAudioAccessor(track)){};
     ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
-    // must check that accessor was created with is_valid()
-    //m_accessor(CreateTrackAudioAccessor(take))
-    safe_audio_accessor_t(MediaTrack* track){
-        // getting the source
-        m_accessor = CreateTrackAudioAccessor(track);
-    };
-    safe_audio_accessor_t(AudioAccessor* accessor) : m_accessor(accessor){};
-    
 
     AudioAccessor* get() { return m_accessor; };
     bool is_valid() { return m_accessor; };
@@ -44,17 +38,17 @@ private:
     AudioAccessor* m_accessor {nullptr};
 };
 
+class audio_pixel_t {
 // one sample of audio pixel data, which stores max, min, and rms values
 // avoid making these when the pixel-to-sample ratio is 1:1, since we can 
 // just store the raw sample value in that case
-class audio_pixel_t {
 public: 
-    audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
     audio_pixel_t() {};
+    audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
 
     void linear_interpolation(double t, double t0, double t1, audio_pixel_t p0, audio_pixel_t p1){
         // updates current pixels fields based on linear interpolation from 
-        // pixels' 1 and 2. 
+        // pixel 0 and 1. 
         m_max = linear_interp(t, t0, t1, p0.m_max, p1.m_max);
         m_min = linear_interp(t, t0, t1, p0.m_min, p1.m_min);
         m_rms = linear_interp(t, t0, t1, p0.m_rms, p1.m_rms);
@@ -68,47 +62,38 @@ public:
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(audio_pixel_t, m_max, m_min, m_rms);
 };
 
+class audio_pixel_block_t {
 // stores one block of mipmapped audio data, at a particular sample rate
 // should be able to update when the samples are updated
-class audio_pixel_block_t {
 public: 
     audio_pixel_block_t() {};
     audio_pixel_block_t(double pix_per_s)
         :m_pix_per_s(pix_per_s) {};
-    audio_pixel_block_t(double pix_per_s, std::vector<std::vector<audio_pixel_t>> channel_pixels)
+    audio_pixel_block_t(double pix_per_s, const std::vector<std::vector<audio_pixel_t>> channel_pixels)
         :m_pix_per_s(pix_per_s), m_channel_pixels(channel_pixels) {};
     ~audio_pixel_block_t() {};
 
-    const int get_mono_pixel_count() {
-        if (m_channel_pixels.size() > 0)
-            return m_channel_pixels[0].size();
-        return 0;
-    }
-    const int get_stero_pixel_count() {
-        if (m_channel_pixels.size() > 0)
-            return m_channel_pixels[0].size() * m_channel_pixels.size();
-        return 0;
-    }
     const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; }
-    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1) const { return m_channel_pixels; } //TODO RETURN FOR REGIONS
+    std::vector<std::vector<audio_pixel_t>> get_pixels(double t0, double t1);
     double get_pps() { return m_pix_per_s; }
+
     bool flush() const; 
     void to_json(json& j) const;
+
     void update(std::vector<double>& sample_buffer, int num_channels, int sample_rate);
-
-
 
 private: 
     std::vector<std::vector<audio_pixel_t>> m_channel_pixels; // vector of audio_pixels for each channel 
     std::string m_guid; // unique-id mapping back to a MediaItemTake, fill w/ GetSetMediaItemTakeInfo_String 
     int m_pix_per_s {1}; // pixels per second
+    int m_block_size {0};
 
 };
 
+class audio_pixel_mipmap_t {
 // hold audio_pixel_block_t at different resolutions
 // and is able to interpolate between them to 
 // get audio pixels at any resolution inbetween
-class audio_pixel_mipmap_t {
 public:
     audio_pixel_mipmap_t(MediaTrack* track, std::vector<int> resolutions)
         :m_accessor(safe_audio_accessor_t(track)),
@@ -123,14 +108,14 @@ public:
         fill_blocks();
     };
 
-    bool flush() const; // flush contents to file
+    // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
+    audio_pixel_block_t get_pixels(double t0, double t1, int pix_per_s);
+    audio_pixel_block_t get_block(int pix_per_s);
+    
     // serialization and deserialization
+    bool flush() const; // flush contents to file
     void to_json(json& j) const;
     void from_json(const json& j);
-
-    // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
-    const std::vector<std::vector<audio_pixel_t>>& get_pixels(double t0, double t1, int pix_per_s);
-    audio_pixel_block_t get_block(int pix_per_s);
 
     void update();
 
@@ -141,8 +126,8 @@ private:
     int get_nearest_pps_helper(int pix_per_s);
     audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, double t0, double t1);
     
-    MediaTrack* m_track {nullptr};
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
     std::map<int, audio_pixel_block_t, std::greater<int>> m_blocks;  
     std::vector<int> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
+    MediaTrack* m_track {nullptr};
 };
