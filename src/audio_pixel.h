@@ -24,8 +24,8 @@ using json = nlohmann::json;
 double linear_interp(double x, double x1, double x2, double y1, double y2);
 double closest_val(double val1, double val2, double target);
 
+// wrapper of an audio accessor 
 class safe_audio_accessor_t {
-// wrapper of an audio accessor to prevent seg faults
 public:
     safe_audio_accessor_t(MediaTrack* track) : m_accessor(CreateTrackAudioAccessor(track)){};
     ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
@@ -37,10 +37,10 @@ private:
     AudioAccessor* m_accessor {nullptr};
 };
 
-class audio_pixel_t {
 // one sample of audio pixel data, which stores max, min, and rms values
 // avoid making these when the pixel-to-sample ratio is 1:1, since we can 
 // just store the raw sample value in that case
+class audio_pixel_t {
 public: 
     audio_pixel_t() {};
     audio_pixel_t(double max, double min, double rms) : m_max(max), m_min(min), m_rms(rms) {};
@@ -61,9 +61,9 @@ public:
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(audio_pixel_t, m_max, m_min, m_rms);
 };
 
-class audio_pixel_block_t {
 // stores one block of mipmapped audio data, at a particular sample rate
 // should be able to update when the samples are updated
+class audio_pixel_block_t {
 public: 
     audio_pixel_block_t() {};
     audio_pixel_block_t(double pix_per_s)
@@ -89,10 +89,10 @@ private:
 
 };
 
-class audio_pixel_mipmap_t {
 // hold audio_pixel_block_t at different resolutions
 // and is able to interpolate between them to 
 // get audio pixels at any resolution inbetween
+class audio_pixel_mipmap_t {
 public:
     audio_pixel_mipmap_t(MediaTrack* track, std::vector<int> resolutions)
         :m_accessor(safe_audio_accessor_t(track)),
