@@ -122,7 +122,6 @@ private:
     int closest_val(double val1, double val2, double target);
     void fill_blocks();
     int get_nearest_pps(int pix_per_s);
-    int get_nearest_pps_helper(int pix_per_s);
     audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, double t0, double t1);
     
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track

@@ -136,15 +136,12 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_block(int pix_per_s){
     return interpolated_block;
 }
 
-int  audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
-    int n_blocks = m_block_pps.size();
-
-    if (pix_per_s <= m_block_pps[0]) // given pps smaller than our smallest rep
-        return m_block_pps[0];
-    else if (pix_per_s >= m_block_pps[n_blocks - 1]) // given pps larger than our largest rep
-        return m_block_pps[n_blocks - 1];
-
-    return get_nearest_pps_helper(pix_per_s);
+int audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
+    auto const it = std::lower_bound(m_block_pps.begin(), m_block_pps.end(), pix_per_s);
+    if (it == m_block_pps.end())
+        return m_block_pps.back();
+    
+    return *it;
 }
 
 audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps, int new_pps, double t0, double t1) {
@@ -194,20 +191,7 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
     return audio_pixel_block_t(new_pps, new_block);
 }
 
- int audio_pixel_mipmap_t::get_nearest_pps_helper(int pix_per_s) {
-    // assumes that we can get m_block_ppps in sorted form after construction of the map
-    if (m_block_pps.size() == 0)
-        return -1;
 
-    int prev_block_val = m_block_pps[0];
-
-    for (int& block_pps : m_block_pps) {
-        if (pix_per_s < block_pps)
-            break;
-        prev_block_val = block_pps;
-    }
-    return prev_block_val;
-}
 
 bool audio_pixel_mipmap_t::flush() const {
     json j;
