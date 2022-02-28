@@ -15,6 +15,17 @@ double closest_val(double val1, double val2, double target) {
     return abs(target - val1) <= abs(target - val2) ? val1 : val2;
 }
 
+template<typename T>
+const std::vector<T> get_view(std::vector<T> const &parent, int start, int end)
+{
+    // todo: make sure start and  end indices are valid
+    auto startptr = v.cbegin() + start;
+    auto endptr = v.cbegin() + end;
+ 
+    std::vector<T> vec(startptr, endptr);
+    return vec;
+}
+
 // ************* audio_pixel_block_t ****************
 
 bool audio_pixel_block_t::flush() const {
@@ -53,31 +64,26 @@ void audio_pixel_block_t::update(std::vector<double>& sample_buffer, int num_cha
     m_block_size = ceil((sample_buffer.size()/num_channels)/m_pix_per_s);
 
     for (int channel= 0; channel < num_channels; channel++) {
-        int collected_samples = 0;
         audio_pixel_t curr_pixel = audio_pixel_t();
         pixels_per_channel = 0;
 
         for (int i = 0; i < sample_buffer.size(); i += num_channels) { 
             double curr_sample = sample_buffer[i];
-
-            // increment collected samples after creating new audio pixel 
-            collected_samples ++;
     
             // update all fields of the current pixeld based on the current sample
             curr_pixel.m_max = std::max(curr_pixel.m_max, curr_sample);
             curr_pixel.m_min = std::min(curr_pixel.m_min, curr_sample);
             curr_pixel.m_rms += (curr_sample * curr_sample);
 
-            if (((collected_samples % samples_per_pixel) == 0) || i == sample_buffer.size() - 1) {
+            if (((i % samples_per_pixel) == 0) || i == sample_buffer.size() - 1) {
                 // complete the RMS calculation, this method accounts of edge cases (total sample % samples per pixel != 0)
-                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / collected_samples);
+                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / (samples_per_pixel - (i % samples_per_pixel)));
 
                 // add the curr pixel to its channel in m_channel_pixels, clear curr_pixel
                 m_channel_pixels[channel].push_back(curr_pixel);
 
                 // set max to equal reaper min, and min to equal reaper max
                 curr_pixel = audio_pixel_t();
-                collected_samples = 0;
                 pixels_per_channel++;
             }
         }
@@ -151,13 +157,13 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
     auto map_entry = m_blocks.find(src_pps);
     audio_pixel_block_t nearest_block = map_entry->second;
     const std::vector<std::vector<audio_pixel_t>> nearest_channel_pixels = nearest_block.get_pixels(t0, t1);
-    int new_number_pixels = (int)round((t1 - t0) * new_pps);
+    int new_number_pixels = ceil((t1 - t0) * new_pps);
 
     double new_t_unit = 1.0/new_pps, nearest_t_unit = 1.0/src_pps; // new/nearest block's time unit (the time between pixels)
-    double nearest_t0 = 0, nearest_t1 = nearest_t_unit; // nearest block's time range and index (position in time of nearest samples)
+    double nearest_t0 = 0.0, nearest_t1 = nearest_t_unit; // nearest block's time range and index (position in time of nearest samples)
     audio_pixel_t nearest_pixel0, nearest_pixel1;
     int nearest_pixel_idx0 = 0, nearest_pixel_idx1 = 1; 
-    double curr_t = 0; // new block's time 
+    double curr_t = 0.0; // new block's time 
 
     std::vector<std::vector<audio_pixel_t>> new_block;
 
@@ -171,8 +177,8 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
             curr_audio_pixel = audio_pixel_t();
             
             // grab the nearest audio pixels and their times
-            nearest_pixel_idx0 = std::min((int)floor(src_pps * curr_t), (int)nearest_pixels.size() - 1); 
-            nearest_pixel_idx1 = std::min((int)ceil(src_pps * curr_t), (int)nearest_pixels.size() - 2); 
+            nearest_pixel_idx0 = std::min((int)floor(src_pps * curr_t), (int)nearest_pixels.size() - 1);
+            nearest_pixel_idx1 = std::min((int)ceil(src_pps * (curr_t + nearest_t_unit)), (int)nearest_pixels.size() - 2);
             nearest_t0 = nearest_pixel_idx0 * nearest_t_unit;
             nearest_t1 = nearest_t0 + nearest_t_unit;
             nearest_pixel0 = nearest_pixels[nearest_pixel_idx0];
