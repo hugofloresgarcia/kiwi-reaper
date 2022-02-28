@@ -104,10 +104,9 @@ std::vector<std::vector<audio_pixel_t>> audio_pixel_block_t::get_pixels(double t
 // ************* audio_pixel_mipmap_t ****************
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(double t0, double t1, int pix_per_s) {
-    // start by grabbing pixels from the nearest two pixel blocks TODO: this will be a vector<double>
     int nearest_pps = get_nearest_pps(pix_per_s);
 
-    if (nearest_pps == pix_per_s){ // last edge case, when hte given pps is already a block
+    if (nearest_pps == pix_per_s){ // last edge case, when the given pps is already a block (other cases in get nearest pps)
         audio_pixel_block_t matching_block = m_blocks[nearest_pps];
         audio_pixel_block_t output_block(pix_per_s, matching_block.get_pixels(t0, t1));
         return output_block;
@@ -119,10 +118,9 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(double t0, double t1, int p
 };
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_block(int pix_per_s){
-        // start by grabbing pixels from the nearest two pixel blocks TODO: this will be a vector<double>
     int nearest_pps = get_nearest_pps(pix_per_s);
 
-    if (nearest_pps == pix_per_s){ // last edge case, when hte given pps is already a block
+    if (nearest_pps == pix_per_s){
         audio_pixel_block_t matching_block = m_blocks[nearest_pps];
         return matching_block;
     }
@@ -133,16 +131,13 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_block(int pix_per_s){
 }
 
 int  audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
-    // TODO: make this a vector of doubles, return the two nearest pps
-    // returning the nearest to first get bilinear interpolation working
-    // 2 edge cases
     int n_blocks = m_block_pps.size();
 
     if (pix_per_s <= m_block_pps[0]) // given pps smaller than our smallest rep
         return m_block_pps[0];
     else if (pix_per_s >= m_block_pps[n_blocks - 1]) // given pps larger than our largest rep
         return m_block_pps[n_blocks - 1];
-    // normal case
+
     return get_nearest_pps_helper(pix_per_s);
 }
 
@@ -151,8 +146,8 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
         t0 = GetAudioAccessorStartTime(m_accessor.get());
     if (t1 == -1)
         t1 = GetAudioAccessorEndTime(m_accessor.get());
+
     // interpolate from the block with nearest-pps to create a new block at new_pps
-    // the tricky part here is keeping track of the which samples from the nearest block are towards us
     auto map_entry = m_blocks.find(src_pps);
     audio_pixel_block_t nearest_block = map_entry->second;
     const std::vector<std::vector<audio_pixel_t>> nearest_channel_pixels = nearest_block.get_pixels(t0, t1);
@@ -176,8 +171,8 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
             curr_audio_pixel = audio_pixel_t();
             
             // grab the nearest audio pixels and their times
-            nearest_pixel_idx0 = std::min((int)floor(src_pps * curr_t), (int)nearest_pixels.size() - 1);
-            nearest_pixel_idx1 = std::min((int)ceil(src_pps * curr_t), (int)nearest_pixels.size() - 2);
+            nearest_pixel_idx0 = std::min((int)floor(src_pps * curr_t), (int)nearest_pixels.size() - 1); 
+            nearest_pixel_idx1 = std::min((int)ceil(src_pps * curr_t), (int)nearest_pixels.size() - 2); 
             nearest_t0 = nearest_pixel_idx0 * nearest_t_unit;
             nearest_t1 = nearest_t0 + nearest_t_unit;
             nearest_pixel0 = nearest_pixels[nearest_pixel_idx0];
@@ -194,7 +189,6 @@ audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps,
 }
 
  int audio_pixel_mipmap_t::get_nearest_pps_helper(int pix_per_s) {
-    // returns the nearest blocks for a given pixels per seconds using a binary search
     // assumes that we can get m_block_ppps in sorted form after construction of the map
     if (m_block_pps.size() == 0)
         return -1;
@@ -238,10 +232,8 @@ void audio_pixel_mipmap_t::update() {
 };
 
 void audio_pixel_mipmap_t::fill_blocks() {
+    // we do need to check the last updated time somehow
     AudioAccessor* safe_accessor = m_accessor.get();
-    // updates the audio acessors contents
-    // AudioAccessorValidateState(safe_accessor);
-    // AudioAccessorUpdate(safe_accessor);
 
     double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
     double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
@@ -260,7 +252,6 @@ void audio_pixel_mipmap_t::fill_blocks() {
     int num_channels = (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN");
 
     // calculate the number of samples we want to collect per channel
-    // TODO CEILING ROUNDING
     int samples_per_channel = sample_rate * (accessor_end_time - accessor_start_time);
     std::vector<double> sample_buffer(samples_per_channel*num_channels);
     int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate, num_channels, accessor_start_time, samples_per_channel, sample_buffer.data());

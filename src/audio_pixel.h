@@ -128,6 +128,6 @@ private:
     
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
     std::map<int, audio_pixel_block_t, std::greater<int>> m_blocks;  
-    std::vector<int> m_block_pps; // sorted list of the blocks pps, TODO fill this up after construction
+    std::vector<int> m_block_pps; // sorted list of the blocks pps
     MediaTrack* m_track {nullptr};
 };
