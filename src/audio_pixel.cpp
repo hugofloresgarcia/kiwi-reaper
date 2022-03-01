@@ -105,9 +105,9 @@ audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> 
     return output_block;
 }
 
-audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps, opt<double> t0, opt<double> t1) {
+audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) {
     // TODO: handle optionals here
-    int new_num_pix = ceil(((*t1) - (*t0)) * new_pps);
+    int new_num_pix = ceil(((get_num_pix_per_channel()) / m_pix_per_s) * new_pps);
 
     // our block's time unit (the time between pixels)
     double m_t_unit = 1.0 / m_pix_per_s; 
@@ -165,15 +165,14 @@ int audio_pixel_block_t::get_num_pix_per_channel() {
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
     int nearest_pps = get_nearest_pps(pix_per_s);
-    //std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
-    if (nearest_pps == pix_per_s){ // last edge case, when the given pps is already a block (other cases in get nearest pps)
-        std::unique_ptr<audio_pixel_block_t> matching_block = std::make_unique<audio_pixel_block_t>(m_blocks[nearest_pps]);
-        return matching_block->get_pixels(t0, t1);
+
+     // bail early if we already have the given pps
+    if (nearest_pps == pix_per_s){
+        return m_blocks[nearest_pps].get_pixels(t0, t1);
     }
 
     // perform interpolation
-    audio_pixel_block_t interpolated_block = create_interpolated_block(nearest_pps, pix_per_s, t0, t1);
-    return interpolated_block.get_pixels(t0, t1);
+    return m_blocks[nearest_pps].get_pixels(t0, t1).interpolate(pix_per_s);
 };
 
 double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
@@ -183,21 +182,6 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     
     return *it;
 }
-
-audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(double src_pps, double new_pps, opt<double> t0 = 0, opt<double> t1 = -1) {
-    // interpolate from the block with nearest-pps to create a new block at new_pps
-    auto map_entry = m_blocks.find(src_pps);
-    std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
-    if (t1 == -1)
-        t1 = nearest_block->get_num_pix_per_channel() / nearest_block->get_pps();
-    
-    // FIXME: this is copying
-    audio_pixel_block_t nearest_channel_pixels = nearest_block->get_pixels(t0, t1);
-
-    return nearest_block->interpolate(new_pps, t0, t1);
-}
-
-
 
 bool audio_pixel_mipmap_t::flush() const {
     json j;

@@ -78,7 +78,7 @@ public:
     audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1);
 
     // creates a new block at a new resolution, via linear interpolation
-    audio_pixel_block_t interpolate(double new_pps, opt<double> t0, opt<double> t1);
+    audio_pixel_block_t interpolate(double new_pps);
 
     // gets the resolution (in pixels per second)
     double get_pps() { return m_pix_per_s; };
