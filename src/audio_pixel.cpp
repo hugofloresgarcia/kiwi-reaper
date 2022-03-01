@@ -200,7 +200,7 @@ bool audio_pixel_mipmap_t::flush() const {
 
 void audio_pixel_mipmap_t::to_json(json& j) const {
     for (auto& map_entry : m_blocks) {
-        j[map_entry.first] = map_entry.second.get_pixels();
+        j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
     }
 }
 
