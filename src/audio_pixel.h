@@ -20,7 +20,6 @@ using opt = std::optional<T>;
 
 // forward declarations
 double linear_interp(double x, double x1, double x2, double y1, double y2);
-double closest_val(double val1, double val2, double target);
 
 // wraps an audio accessor
 class safe_audio_accessor_t {

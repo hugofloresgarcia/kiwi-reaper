@@ -20,10 +20,6 @@ double linear_interp(double x, double x1, double x2, double y1, double y2) {
     return (((x2 - x) / (x2 - x1)) * y1) + ((x - x1) / (x2 - x1)) * y2;
 }
 
-double closest_val(double val1, double val2, double target) {
-    return abs(target - val1) <= abs(target - val2) ? val1 : val2;
-}
-
 template<typename T>
 const vec<T> get_view(vec<T> const &parent, int start, int end)
 {
