@@ -1,5 +1,6 @@
 #include "audio_pixel.h"
 #include "osc.h"
+#include <thread>
 
 #include "reaper_plugin_functions.h"
 
@@ -31,13 +32,14 @@ public:
     using Msg = oscpkt::Message;
 
     // add a callback to listen to
-    m_manager->add_callback("/move_edit_cursor",
+    m_manager->add_callback("/set_cursor",
     [](Msg& msg){
-      float move_amt;
-      if (msg.arg().popFloat(move_amt)
+      int index;
+      if (msg.arg().popInt32(index)
                    .isOkNoMoreArgs()){
+        double t = index / GetHZoomLevel();
         SetEditCurPos(
-          GetCursorPosition() + (double)move_amt, 
+          t, 
           true, true
         );
       }
@@ -45,10 +47,11 @@ public:
 
     m_manager->add_callback("/zoom",
     [](Msg& msg){
-      int xdir;
-      if (msg.arg().popInt32(xdir)
+      double amt;
+      if (msg.arg().popDouble(amt)
                    .isOkNoMoreArgs()){
-        CSurf_OnZoom(xdir, 0);
+        adjustZoom(GetHZoomLevel() * amt, 1, true, -1);
+        // CSurf_OnZoom(xdir, 0);
       }
     });
 
@@ -64,10 +67,29 @@ public:
 
       // get the current resolution
       double pix_per_s = GetHZoomLevel();
-      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(0, 9, pix_per_s);
+      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
 
       json j;
       interpolated_block.to_json(j);
+
+      // just gonna send the first channel for now
+      int channel = 0;
+      const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[channel];
+
+      // send the pixels, one by one,
+      // along w/ an index
+      for (int i = 0 ; i < pixels.size() ; i++) {
+        oscpkt::Message msg("/pixel");
+        json j;
+        j["id"] = i;
+        j["value"] = pixels[i].m_max;
+
+        msg.pushStr(j.dump());
+        
+        // send the message
+        m_manager->send(msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
       
     } 
 

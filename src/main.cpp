@@ -22,7 +22,7 @@ static bool testAction(int commandId, int flat){
   return true;
 }
 
-static std::string ADDRESS = "127.0.0.1";
+static std::string ADDRESS = "192.168.0.198";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
@@ -37,6 +37,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
     return 0;
 
   // register api functions that we want
+  REG_FUNC(adjustZoom, rec);
   REG_FUNC(AudioAccessorStateChanged, rec);
   REG_FUNC(AudioAccessorUpdate, rec);
   REG_FUNC(AudioAccessorValidateState, rec);
