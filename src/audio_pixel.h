@@ -5,18 +5,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <math.h>
-#include <memory>
-#include <string>
-
 #include "include/json/json.hpp"
 #include "reaper_plugin_functions.h"
-#include "reaper_plugin.h"
 
 using json = nlohmann::json;
 
@@ -99,7 +89,7 @@ public:
         :m_accessor(safe_audio_accessor_t(track)),
         m_track(track)
     {
-        if (!m_accessor.is_valid()) { std::cerr << "Invalid audio accessor used for audio block." << std::endl; }
+        if (!m_accessor.is_valid()) { return; }
         for (double res : resolutions) {
             m_blocks[res] = audio_pixel_block_t(res);
         }

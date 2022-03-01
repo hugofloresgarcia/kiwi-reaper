@@ -1,6 +1,14 @@
 #include "audio_pixel.h"
 #define project nullptr
 
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <limits>
+#include <math.h>
+#include <memory>
+#include <string>
+
 // audio pixel functions 
 
 double linear_interp(double x, double x1, double x2, double y1, double y2) {
@@ -28,23 +36,8 @@ const std::vector<T> get_view(std::vector<T> const &parent, int start, int end)
 
 // ************* audio_pixel_block_t ****************
 
-bool audio_pixel_block_t::flush() const {
-    json j;
-    to_json(j);
-    std::string resource_path = GetResourcePath();
-    std::ofstream ofs;
-    ofs.open(resource_path + "/kiwi-block.json");
-
-    if (!ofs.is_open()){
-        return false;
-    }
-    
-    ofs << std::setw(4) << j << std::endl;
-    return true;
-}
-
 void audio_pixel_block_t::to_json(json& j) const {
-    j[std::to_string(m_pix_per_s)] = m_channel_pixels;
+    j = m_channel_pixels;
 }
 
 void audio_pixel_block_t::update(std::vector<double>& sample_buffer, int num_channels, int sample_rate) {
