@@ -59,19 +59,16 @@ public:
       if (!item) {return;} // TODO: LOG ME
 
       MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-      std::vector<int> resolutions = {41000, 10250, 2561, 639, 107};
+      std::vector<int> resolutions = {10250, 2561, 639, 107, 1};
       m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
-      // m_mipmap->flush();
 
-      std::vector<std::vector<audio_pixel_t>> interpolated_block = m_mipmap->get_pixels(10, 12, 300);
-      //audio_pixel_block_t interpolated_block = m_mipmap->get_block(300);
+      // get the current resolution
+      double pix_per_s = GetHZoomLevel();
+      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(0, 9, (int)pix_per_s);
+
       json j;
-      j[300] = interpolated_block;
-      std::string resource_path = GetResourcePath();
-      std::ofstream ofs;
-      ofs.open(resource_path + "/kiwi-block.json");
-      if (!ofs.is_open()){return;}
-      ofs << std::setw(4) << j << std::endl;
+      interpolated_block.to_json(j);
+      
     } 
 
 
