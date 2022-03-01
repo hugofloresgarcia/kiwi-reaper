@@ -61,7 +61,6 @@ void audio_pixel_block_t::update(std::vector<double>& sample_buffer, int num_cha
 
     //calcualte the samples per audio pixel and initalize an audio pixel
     int samples_per_pixel = sample_rate / m_pix_per_s;
-    m_block_size = ceil((sample_buffer.size()/num_channels)/m_pix_per_s);
 
     for (int channel= 0; channel < num_channels; channel++) {
         audio_pixel_t curr_pixel = audio_pixel_t();
@@ -90,50 +89,48 @@ void audio_pixel_block_t::update(std::vector<double>& sample_buffer, int num_cha
     }
 }
 
-std::vector<std::vector<audio_pixel_t>> audio_pixel_block_t::get_pixels(double t0, double t1) {
+std::vector<std::vector<audio_pixel_t>> audio_pixel_block_t::get_pixels(std::optional<double> t0, std::optional<double> t1) {
+    int block_size = get_pixels_per_block(); 
+    int starting_idx =  t0.has_value() ? std::max(0, (int)(*t0 * m_pix_per_s)) : 0;
+    int ending_idx = t1 != -1 ? std::min((int)(*t1 * m_pix_per_s), block_size) : block_size;
     std::vector<std::vector<audio_pixel_t>> output_block;
-    int starting_idx =  std::max(0, (int)(t0 * m_pix_per_s));
-    int ending_idx = std::min((int)(t1 * m_pix_per_s), m_block_size);
 
     for (int channel = 0; channel < m_channel_pixels.size(); channel++){
-        std::vector<audio_pixel_t> channel_block = m_channel_pixels[channel];
-        std::vector<audio_pixel_t> subset_block;
-        for (int i = starting_idx; i < ending_idx && i < channel_block.size(); i++) {
-            subset_block.push_back(channel_block[i]);
-        }
-        output_block.push_back(subset_block);
+        output_block.push_back(get_view(m_channel_pixels[channel], starting_idx, ending_idx));
     }
 
     return output_block;
 }
 
+int audio_pixel_block_t::get_pixels_per_block() { 
+    return m_channel_pixels.empty() ? 0 : m_channel_pixels.front().size(); 
+}
+
 // ************* audio_pixel_mipmap_t ****************
 
-audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(double t0, double t1, int pix_per_s) {
+std::vector<std::vector<audio_pixel_t>> audio_pixel_mipmap_t::get_pixels(double t0, double t1, int pix_per_s) {
     int nearest_pps = get_nearest_pps(pix_per_s);
-
+    //std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
     if (nearest_pps == pix_per_s){ // last edge case, when the given pps is already a block (other cases in get nearest pps)
-        audio_pixel_block_t matching_block = m_blocks[nearest_pps];
-        audio_pixel_block_t output_block(pix_per_s, matching_block.get_pixels(t0, t1));
-        return output_block;
+        std::unique_ptr<audio_pixel_block_t> matching_block = std::make_unique<audio_pixel_block_t>(m_blocks[nearest_pps]);
+        return matching_block->get_pixels(t0, t1);
     }
 
     // perform interpolation
     audio_pixel_block_t interpolated_block = create_interpolated_block(nearest_pps, pix_per_s, t0, t1);
-    return interpolated_block;
+    return interpolated_block.get_pixels(0, -1);
 };
 
-audio_pixel_block_t audio_pixel_mipmap_t::get_block(int pix_per_s){
+std::vector<std::vector<audio_pixel_t>> audio_pixel_mipmap_t::get_block(int pix_per_s){
     int nearest_pps = get_nearest_pps(pix_per_s);
 
     if (nearest_pps == pix_per_s){
-        audio_pixel_block_t matching_block = m_blocks[nearest_pps];
-        return matching_block;
+        return m_blocks[nearest_pps].get_pixels(0, -1);
     }
 
     // perform interpolation
     audio_pixel_block_t interpolated_block = create_interpolated_block(nearest_pps, pix_per_s, -1, -1);
-    return interpolated_block;
+    return interpolated_block.get_pixels(0, -1);
 }
 
 int audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
@@ -144,17 +141,16 @@ int audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
     return *it;
 }
 
-audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps, int new_pps, double t0, double t1) {
-    if (t0 == -1)
-        t0 = GetAudioAccessorStartTime(m_accessor.get());
-    if (t1 == -1)
-        t1 = GetAudioAccessorEndTime(m_accessor.get());
-
+audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps, int new_pps, std::optional<double> t0 = 0, std::optional<double> t1 = -1) {
     // interpolate from the block with nearest-pps to create a new block at new_pps
     auto map_entry = m_blocks.find(src_pps);
-    audio_pixel_block_t nearest_block = map_entry->second;
-    const std::vector<std::vector<audio_pixel_t>> nearest_channel_pixels = nearest_block.get_pixels(t0, t1);
-    int new_number_pixels = ceil((t1 - t0) * new_pps);
+    std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
+    if (t1 == -1)
+        t1 = nearest_block->get_pixels_per_block() / nearest_block->get_pps();
+    
+    const std::vector<std::vector<audio_pixel_t>> nearest_channel_pixels = nearest_block->get_pixels(t0, t1);
+
+    int new_number_pixels = ceil(((*t1) - (*t0)) * new_pps);
 
     double new_t_unit = 1.0/new_pps, nearest_t_unit = 1.0/src_pps; // new/nearest block's time unit (the time between pixels)
     double nearest_t0 = 0.0, nearest_t1 = nearest_t_unit; // nearest block's time range and index (position in time of nearest samples)

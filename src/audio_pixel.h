@@ -72,9 +72,10 @@ public:
         :m_pix_per_s(pix_per_s), m_channel_pixels(channel_pixels) {};
     ~audio_pixel_block_t() {};
 
-    const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; }
-    std::vector<std::vector<audio_pixel_t>> get_pixels(double t0, double t1);
-    double get_pps() { return m_pix_per_s; }
+    const std::vector<std::vector<audio_pixel_t>>& get_pixels() const { return m_channel_pixels; };
+    std::vector<std::vector<audio_pixel_t>> get_pixels(std::optional<double> t0, std::optional<double> t1);
+    double get_pps() { return m_pix_per_s; };
+    int get_pixels_per_block();
 
     bool flush() const; 
     void to_json(json& j) const;
@@ -82,10 +83,10 @@ public:
     void update(std::vector<double>& sample_buffer, int num_channels, int sample_rate);
 
 private: 
+
     std::vector<std::vector<audio_pixel_t>> m_channel_pixels; // vector of audio_pixels for each channel 
     std::string m_guid; // unique-id mapping back to a MediaItemTake, fill w/ GetSetMediaItemTakeInfo_String 
     int m_pix_per_s {1}; // pixels per second
-    int m_block_size {0};
 
 };
 
@@ -108,8 +109,8 @@ public:
     };
 
     // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
-    audio_pixel_block_t get_pixels(double t0, double t1, int pix_per_s);
-    audio_pixel_block_t get_block(int pix_per_s);
+    std::vector<std::vector<audio_pixel_t>> get_pixels(double t0, double t1, int pix_per_s);
+    std::vector<std::vector<audio_pixel_t>> get_block(int pix_per_s);
     
     // serialization and deserialization
     bool flush() const; // flush contents to file
@@ -122,7 +123,7 @@ private:
     int closest_val(double val1, double val2, double target);
     void fill_blocks();
     int get_nearest_pps(int pix_per_s);
-    audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, double t0, double t1);
+    audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, std::optional<double> t0, std::optional<double> t1);
     
     safe_audio_accessor_t m_accessor; // to get samples from the MediaItem_track
     std::map<int, audio_pixel_block_t, std::greater<int>> m_blocks;  

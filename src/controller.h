@@ -61,10 +61,17 @@ public:
       MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
       std::vector<int> resolutions = {41000, 10250, 2561, 639, 107};
       m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
+      // m_mipmap->flush();
 
-      // audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(10, -1, 300);
-      audio_pixel_block_t interpolated_block = m_mipmap->get_block(300);
-      interpolated_block.flush();
+      std::vector<std::vector<audio_pixel_t>> interpolated_block = m_mipmap->get_pixels(10, 12, 300);
+      //audio_pixel_block_t interpolated_block = m_mipmap->get_block(300);
+      json j;
+      j[300] = interpolated_block;
+      std::string resource_path = GetResourcePath();
+      std::ofstream ofs;
+      ofs.open(resource_path + "/kiwi-block.json");
+      if (!ofs.is_open()){return;}
+      ofs << std::setw(4) << j << std::endl;
     } 
 
 
