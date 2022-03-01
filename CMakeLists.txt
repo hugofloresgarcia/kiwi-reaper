@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # set project name and version
@@ -45,6 +45,7 @@ add_library(kiwi SHARED
     include/oscpkt/udp.hh
     include/json/json.hpp
     src/audio_pixel.h
+    src/audio_pixel.cpp
     src/controller.h
     src/osc.h
     src/main.cpp
