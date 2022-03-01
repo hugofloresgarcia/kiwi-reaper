@@ -59,12 +59,12 @@ public:
       if (!item) {return;} // TODO: LOG ME
 
       MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-      std::vector<int> resolutions = {10250, 2561, 639, 107, 1};
+      std::vector<double> resolutions = {10250, 2561, 639, 107, 1};
       m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
 
       // get the current resolution
       double pix_per_s = GetHZoomLevel();
-      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(0, 9, (int)pix_per_s);
+      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(0, 9, pix_per_s);
 
       json j;
       interpolated_block.to_json(j);

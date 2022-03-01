@@ -41,7 +41,6 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, i
     // constructs an audio pixel block using interleaved sample buffer and num channels
     // clear the current set of audio pixels 
     m_channel_pixels.clear();
-    int pixels_per_channel = 0;
 
     // initalize the m_channel_pixels to have empty audio pixel vectors
     for (int i = 0; i < num_channels; i++) {
@@ -52,9 +51,8 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, i
     //calcualte the samples per audio pixel and initalize an audio pixel
     int samples_per_pixel = sample_rate / m_pix_per_s;
 
-    for (int channel= 0; channel < num_channels; channel++) {
+    for (int channel = 0; channel < num_channels; channel++) {
         audio_pixel_t curr_pixel = audio_pixel_t();
-        pixels_per_channel = 0;
 
         for (int i = 0; i < sample_buffer.size(); i += num_channels) { 
             double curr_sample = sample_buffer[i];
@@ -64,16 +62,16 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, i
             curr_pixel.m_min = std::min(curr_pixel.m_min, curr_sample);
             curr_pixel.m_rms += (curr_sample * curr_sample);
 
-            if (((i % samples_per_pixel) == 0) || i == sample_buffer.size() - 1) {
+            int collected_samples = i % samples_per_pixel;
+            if ((collected_samples == 0) || i == sample_buffer.size() - 1) {
                 // complete the RMS calculation, this method accounts of edge cases (total sample % samples per pixel != 0)
-                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / (samples_per_pixel - (i % samples_per_pixel)));
+                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / (samples_per_pixel - collected_samples));
 
                 // add the curr pixel to its channel in m_channel_pixels, clear curr_pixel
                 m_channel_pixels[channel].push_back(curr_pixel);
 
-                // set max to equal reaper min, and min to equal reaper max
+                // reset pix
                 curr_pixel = audio_pixel_t();
-                pixels_per_channel++;
             }
         }
     }
@@ -165,7 +163,7 @@ int audio_pixel_block_t::get_num_pix_per_channel() {
 
 // ************* audio_pixel_mipmap_t ****************
 
-audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, int pix_per_s) {
+audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
     int nearest_pps = get_nearest_pps(pix_per_s);
     //std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
     if (nearest_pps == pix_per_s){ // last edge case, when the given pps is already a block (other cases in get nearest pps)
@@ -178,7 +176,7 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double>
     return interpolated_block.get_pixels(t0, t1);
 };
 
-int audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
+double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     auto const it = std::lower_bound(m_block_pps.begin(), m_block_pps.end(), pix_per_s);
     if (it == m_block_pps.end())
         return m_block_pps.back();
@@ -186,7 +184,7 @@ int audio_pixel_mipmap_t::get_nearest_pps(int pix_per_s) {
     return *it;
 }
 
-audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(int src_pps, int new_pps, opt<double> t0 = 0, opt<double> t1 = -1) {
+audio_pixel_block_t audio_pixel_mipmap_t::create_interpolated_block(double src_pps, double new_pps, opt<double> t0 = 0, opt<double> t1 = -1) {
     // interpolate from the block with nearest-pps to create a new block at new_pps
     auto map_entry = m_blocks.find(src_pps);
     std::unique_ptr<audio_pixel_block_t> nearest_block = std::make_unique<audio_pixel_block_t>(map_entry->second);
@@ -218,7 +216,7 @@ bool audio_pixel_mipmap_t::flush() const {
 
 void audio_pixel_mipmap_t::to_json(json& j) const {
     for (auto& map_entry : m_blocks) {
-        j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
+        j[map_entry.first] = map_entry.second.get_pixels();
     }
 }
 
@@ -226,18 +224,21 @@ void audio_pixel_mipmap_t::update() {
     // update all blocks
     // MUST BE CALLED BY MAIN THREAD
     // due to reaper api calls: AudioAccessorUpdate
-    fill_blocks();
+    fill();
 };
 
-void audio_pixel_mipmap_t::fill_blocks() {
-    // we do need to check the last updated time somehow
+void audio_pixel_mipmap_t::fill() {
+    // TODO: we do need to check the last updated time somehow
     AudioAccessor* safe_accessor = m_accessor.get();
 
     double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
     double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
 
+    // get the media item
     MediaItem* item = GetSelectedMediaItem(project, 0);
     if (!item) {return;} // TODO: LOG ME
+
+    // get the active take
     MediaItem_Take* take = GetActiveTake(item);
     if (!take) {return;} // TODO: LOG ME
 
@@ -245,6 +246,7 @@ void audio_pixel_mipmap_t::fill_blocks() {
     PCM_source* source = GetMediaItemTake_Source(take);
     if (!source) { return; } // TODO: LOG ME
 
+    // get sample rate
     GetSetProjectInfo(0, "PROJECT_SRATE_USE", 1, true);
     int sample_rate = GetSetProjectInfo(0, "PROJECT_SRATE", 0, true);
     int num_channels = (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN");

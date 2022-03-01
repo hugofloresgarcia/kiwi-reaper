@@ -106,7 +106,7 @@ private:
 // get audio pixels at any resolution inbetween
 class audio_pixel_mipmap_t {
 public:
-    audio_pixel_mipmap_t(MediaTrack* track, vec<int> resolutions)
+    audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions)
         :m_accessor(safe_audio_accessor_t(track)),
         m_track(track)
     {
@@ -116,11 +116,11 @@ public:
         }
         m_block_pps = resolutions;
         std::sort(m_block_pps.begin(), m_block_pps.end());
-        fill_blocks();
+        fill();
     };
 
     // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
-    audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, int pix_per_s);
+    audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, double pix_per_s);
     
     // serialization and deserialization
     bool flush() const; // flush contents to file
@@ -133,17 +133,17 @@ private:
     int closest_val(double val1, double val2, double target);
 
     // fills all cached blocks with audio pixel data
-    void fill_blocks();
+    void fill();
 
     // finds the lower bound of cached resolutions
-    int get_nearest_pps(int pix_per_s);
+    double get_nearest_pps(double pix_per_s);
 
     // create a new interpolated block from a source block
-    audio_pixel_block_t create_interpolated_block(int src_pps, int new_pps, opt<double> t0, opt<double> t1);
+    audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps, opt<double> t0, opt<double> t1);
     
     // to get samples from the MediaItem_track
     safe_audio_accessor_t m_accessor; 
-    std::map<int, audio_pixel_block_t, std::greater<int>> m_blocks;  
-    vec<int> m_block_pps; // sorted list of the blocks pps
+    std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;  
+    vec<double> m_block_pps; // sorted list of the blocks pps
     MediaTrack* m_track {nullptr};
 };
