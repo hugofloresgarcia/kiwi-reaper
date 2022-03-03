@@ -19,6 +19,8 @@ template<typename T>
 using opt = std::optional<T>; 
 
 // forward declarations
+int pps_to_samples_per_pix(double pix_per_s, int sample_rate);
+double samples_per_pix_to_pps(int samples_per_pix, int sample_rate);
 double linear_interp(double x, double x1, double x2, double y1, double y2);
 
 // wraps an audio accessor
@@ -106,18 +108,7 @@ private:
 // get audio pixels at any resolution inbetween
 class audio_pixel_mipmap_t {
 public:
-    audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions)
-        :m_accessor(safe_audio_accessor_t(track)),
-        m_track(track)
-    {
-        if (!m_accessor.is_valid()) { return; }
-        for (double res : resolutions) {
-            m_blocks[res] = audio_pixel_block_t(res);
-        }
-        m_block_pps = resolutions;
-        std::sort(m_block_pps.begin(), m_block_pps.end());
-        fill();
-    };
+    audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions);
 
     // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
     audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, double pix_per_s);
@@ -125,13 +116,20 @@ public:
     // serialization and deserialization
     bool flush() const; // flush contents to file
     void to_json(json& j) const;
-    void from_json(const json& j);
+    void from_json(const json& j); // TODO: implement me 
 
+    // update contents of the mipmap 
+    // (if the audio accessor state has changed)
     void update();
 
-private:
-    int closest_val(double val1, double val2, double target);
+    int num_channels() { return (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN"); }
 
+    static int sample_rate() {
+        GetSetProjectInfo(0, "PROJECT_SRATE_USE", 1, true);
+        return (int)GetSetProjectInfo(0, "PROJECT_SRATE", 0, true); 
+    }
+
+private:
     // fills all cached blocks with audio pixel data
     void fill();
 
@@ -143,7 +141,13 @@ private:
     
     // to get samples from the MediaItem_track
     safe_audio_accessor_t m_accessor; 
-    std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;  
-    vec<double> m_block_pps; // sorted list of the blocks pps
+
+    // the lo-res pixel blocks
+    std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;
+
+    // sorted list of the blocks pps
+    vec<double> m_block_pps; 
+
+    // our parent media track
     MediaTrack* m_track {nullptr};
 };

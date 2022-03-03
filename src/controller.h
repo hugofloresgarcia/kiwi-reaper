@@ -6,6 +6,99 @@
 
 #define project nullptr
 
+class HapticTrack {
+
+public: 
+  HapticTrack() {
+    // the first selected media item for now
+    m_item = GetSelectedMediaItem(0, 0);
+    if (!m_item) {
+      return; // TODO: LOG ME
+    }
+
+    // get a hold of the track
+    MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(m_item, "P_TRACK", nullptr);
+
+    setup(track);
+  }
+
+  
+  void setup(MediaTrack *track) {
+    if (!track) {
+      return;// TODO: LOG ME
+    }
+
+    m_track = track;
+
+    // TODO: how are we dealing when the resolution is larger than the track itself? 
+    std::vector<int> resolutions = {256, 1024, 4096, 16384, 65536, 262144};
+    std::vector<double> pix_per_s_res;
+    for (int res : resolutions) {
+      pix_per_s_res.push_back(samples_per_pix_to_pps(res, audio_pixel_mipmap_t::sample_rate()));
+    }
+
+    m_mipmap = std::make_unique<audio_pixel_mipmap_t>(m_track, pix_per_s_res);
+
+    m_active_channel = m_mipmap->num_channels();
+  }
+
+  // moves to the prev take or track
+  HapticTrack prev();
+
+  // moves to the next take or track
+  HapticTrack next();
+ 
+  void next_channel() {
+    m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels();
+  }
+
+  void prev_channel() {
+    m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels();
+  } 
+
+  void set_cursor(int mip_map_idx) {
+    double t = mip_map_idx / GetHZoomLevel();
+    SetEditCurPos(t, true, true);
+  }
+
+  void zoom(double amt) {
+    adjustZoom(GetHZoomLevel() * amt, 1, true, -1);
+  }
+
+  int get_active_channel() { return m_active_channel; }
+  
+  // returns the current track name
+  std::string get_track_name();
+
+  // returns the current take name
+  std::string get_take_name();
+
+  // moves the selected region by an amt
+  // TODO: implement me
+  void move();
+
+  // slices at current cursor position
+  // TODO: implement me
+  void slice();
+
+  // returns the pixels at the current resolution
+  audio_pixel_block_t get_pixels() {
+    // get the current resolution
+    double pix_per_s = GetHZoomLevel();
+
+    return m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
+  }
+
+private:
+  MediaTrack* m_track {nullptr};
+  MediaItem* m_item {nullptr};
+  MediaItem_Take* m_take {nullptr};
+
+  int m_active_channel {0};
+
+  std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
+};
+
 class OSCController : IReaperControlSurface {
   OSCController();
 public: 
@@ -18,6 +111,8 @@ public:
 
   bool init () {
     bool success = m_manager->init();
+    // TODO: we should have a pointer to an
+    // active track object 
     add_callbacks();
     return success;
   }
@@ -33,48 +128,32 @@ public:
 
     // add a callback to listen to
     m_manager->add_callback("/set_cursor",
-    [](Msg& msg){
+    [this](Msg& msg){
       int index;
       if (msg.arg().popInt32(index)
                    .isOkNoMoreArgs()){
-        double t = index / GetHZoomLevel();
-        SetEditCurPos(
-          t, 
-          true, true
-        );
+        m_track->set_cursor(index);
       }
     });
 
     m_manager->add_callback("/zoom",
-    [](Msg& msg){
+    [this](Msg& msg){
       double amt;
       if (msg.arg().popDouble(amt)
                    .isOkNoMoreArgs()){
-        adjustZoom(GetHZoomLevel() * amt, 1, true, -1);
-        // CSurf_OnZoom(xdir, 0);
+        m_track->zoom(amt);
       }
     });
 
     m_manager->add_callback("/init",
     [this](Msg& msg){
-      // // the first selected media item for now
-      MediaItem* item = GetSelectedMediaItem(0, 0);
-      if (!item) {return;} // TODO: LOG ME
-
-      MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(item, "P_TRACK", nullptr);
-      std::vector<double> resolutions = {10250, 2561, 639, 107, 1};
-      m_mipmap = std::make_unique<audio_pixel_mipmap_t>(track, resolutions);
-
-      // get the current resolution
-      double pix_per_s = GetHZoomLevel();
-      audio_pixel_block_t interpolated_block = m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
+      m_track = std::make_unique<HapticTrack>();
+      
+      audio_pixel_block_t interpolated_block = m_track->get_pixels();
+      const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[m_track->get_active_channel()];
 
       json j;
       interpolated_block.to_json(j);
-
-      // just gonna send the first channel for now
-      int channel = 0;
-      const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[channel];
 
       // send the pixels, one by one,
       // along w/ an index
@@ -90,11 +169,7 @@ public:
         m_manager->send(msg);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
-      
-    } 
-
-
-    );
+    });
   };
 
   // this runs about 30x per second. do all OSC polling here
@@ -105,5 +180,6 @@ public:
 
 private:
   std::unique_ptr<OSCManager> m_manager {nullptr};
-  std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
+  std::unique_ptr<HapticTrack> m_track;
+
 };

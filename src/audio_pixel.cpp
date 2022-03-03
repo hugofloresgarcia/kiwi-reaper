@@ -12,6 +12,14 @@
 
 // audio pixel functions 
 
+int pps_to_samples_per_pix(double pix_per_s, int sample_rate) {
+    return ceil(sample_rate / pix_per_s);
+}
+
+double samples_per_pix_to_pps(int samples_per_pix, int sample_rate) {
+    return sample_rate / samples_per_pix;
+}
+
 double linear_interp(double x, double x1, double x2, double y1, double y2) {
     // edge cases 
     if ((x2-x1) == 0)
@@ -163,6 +171,18 @@ int audio_pixel_block_t::get_num_pix_per_channel() {
 
 // ************* audio_pixel_mipmap_t ****************
 
+audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions)
+    :m_accessor(safe_audio_accessor_t(track)), m_track(track) {
+
+    if (!m_accessor.is_valid()) { return; }
+    for (double res : resolutions) {
+        m_blocks[res] = audio_pixel_block_t(res);
+    }
+    m_block_pps = resolutions;
+    std::sort(m_block_pps.begin(), m_block_pps.end());
+    fill();
+}
+
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
     int nearest_pps = get_nearest_pps(pix_per_s);
 
@@ -173,7 +193,7 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double>
 
     // perform interpolation
     return m_blocks[nearest_pps].get_pixels(t0, t1).interpolate(pix_per_s);
-};
+}
 
 double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     auto const it = std::lower_bound(m_block_pps.begin(), m_block_pps.end(), pix_per_s);
@@ -218,37 +238,25 @@ void audio_pixel_mipmap_t::fill() {
     double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
     double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
 
-    // get the media item
-    MediaItem* item = GetSelectedMediaItem(project, 0);
-    if (!item) {return;} // TODO: LOG ME
-
-    // get the active take
-    MediaItem_Take* take = GetActiveTake(item);
-    if (!take) {return;} // TODO: LOG ME
-
-    // retrive the takes sample rate and num channels from PCM source
-    PCM_source* source = GetMediaItemTake_Source(take);
-    if (!source) { return; } // TODO: LOG ME
-
     // get sample rate
-    GetSetProjectInfo(0, "PROJECT_SRATE_USE", 1, true);
-    int sample_rate = GetSetProjectInfo(0, "PROJECT_SRATE", 0, true);
-    int num_channels = (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN");
-
+    
     // calculate the number of samples we want to collect per channel
-    int samples_per_channel = sample_rate * (accessor_end_time - accessor_start_time);
-    vec<double> sample_buffer(samples_per_channel*num_channels);
-    int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate, num_channels, accessor_start_time, samples_per_channel, sample_buffer.data());
+    int samples_per_channel = sample_rate() * (accessor_end_time - accessor_start_time);
+    vec<double> sample_buffer(samples_per_channel*num_channels());
+
+    int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate(), num_channels(), 
+                                                accessor_start_time, samples_per_channel, 
+                                                sample_buffer.data());
 
     // samples stored in sample_buffer, operation status is returned
     if (!sample_status) {
-        return;
-    } // TODO: LOG ME
+        return; // TODO: LOG ME
+    } 
 
     // pass samples to update audio pixel blocks
     for (auto& it : m_blocks) {
         std::cout << std::to_string(it.first) << std::endl;
-        it.second.update(sample_buffer, num_channels, sample_rate);
+        it.second.update(sample_buffer, num_channels(), sample_rate());
     };
 
 }
