@@ -39,7 +39,7 @@ public:
 
     m_mipmap = std::make_unique<audio_pixel_mipmap_t>(m_track, pix_per_s_res);
 
-    m_active_channel = m_mipmap->num_channels();
+    m_active_channel = 0;
   }
 
   // moves to the prev take or track
@@ -121,6 +121,26 @@ public:
 
   // TODO: should switch focus to last selected track
   void OnTrackSelection(MediaTrack *trackid) override {};
+
+  void send_pixel_update() {
+    audio_pixel_block_t interpolated_block = m_track->get_pixels();
+    const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[m_track->get_active_channel()];
+
+    // send the pixels, one by one,
+    // along w/ an index
+    for (int i = 0 ; i < pixels.size() ; i++) {
+      oscpkt::Message msg("/pixel");
+      json j;
+      j["id"] = i;
+      j["value"] = pixels[i].m_max;
+
+      msg.pushStr(j.dump());
+      
+      // send the message
+      m_manager->send(msg);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
   
   // use this to register all callbacks with the osc manager
   void add_callbacks() {
@@ -138,10 +158,11 @@ public:
 
     m_manager->add_callback("/zoom",
     [this](Msg& msg){
-      double amt;
-      if (msg.arg().popDouble(amt)
+      float amt;
+      if (msg.arg().popFloat(amt)
                    .isOkNoMoreArgs()){
-        m_track->zoom(amt);
+        m_track->zoom((double)amt);
+        send_pixel_update();
       }
     });
 
@@ -149,26 +170,7 @@ public:
     [this](Msg& msg){
       m_track = std::make_unique<HapticTrack>();
       
-      audio_pixel_block_t interpolated_block = m_track->get_pixels();
-      const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[m_track->get_active_channel()];
-
-      json j;
-      interpolated_block.to_json(j);
-
-      // send the pixels, one by one,
-      // along w/ an index
-      for (int i = 0 ; i < pixels.size() ; i++) {
-        oscpkt::Message msg("/pixel");
-        json j;
-        j["id"] = i;
-        j["value"] = pixels[i].m_max;
-
-        msg.pushStr(j.dump());
-        
-        // send the message
-        m_manager->send(msg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
+      send_pixel_update();
     });
   };
 
