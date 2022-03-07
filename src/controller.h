@@ -1,109 +1,76 @@
 #include "audio_pixel.h"
+#include "haptic_track.h"
 #include "osc.h"
 #include <thread>
-
-#include "reaper_plugin_functions.h"
+#include <queue>
 
 #define project nullptr
 
-class HapticTrack {
+#pragma once
 
-public: 
-  HapticTrack() {
-    // the first selected media item for now
-    m_item = GetSelectedMediaItem(0, 0);
-    if (!m_item) {
-      return; // TODO: LOG ME
+using std::unique_ptr;
+
+class pixel_block_sender_t {
+public:
+  pixel_block_sender_t(haptic_track_t& track,
+                       shared_ptr<osc_manager_t> manager) 
+      : m_track(track), m_manager(manager) { }
+
+
+  void send(bool block = false) {
+    if (!block) {
+      m_worker = std::thread(&pixel_block_sender_t::do_send, this);
+    } else {
+      do_send();
     }
-
-    // get a hold of the track
-    MediaTrack* track = (MediaTrack*)GetSetMediaItemInfo(m_item, "P_TRACK", nullptr);
-
-    setup(track);
   }
 
-  
-  void setup(MediaTrack *track) {
-    if (!track) {
-      return;// TODO: LOG ME
+  void abort () {
+    m_abort = true;
+  }
+
+  ~pixel_block_sender_t() {
+    if (m_worker.joinable()) {
+      m_worker.join();
     }
-
-    m_track = track;
-
-    // TODO: how are we dealing when the resolution is larger than the track itself? 
-    std::vector<int> resolutions = {256, 1024, 4096, 16384, 65536, 262144};
-    std::vector<double> pix_per_s_res;
-    for (int res : resolutions) {
-      pix_per_s_res.push_back(samples_per_pix_to_pps(res, audio_pixel_mipmap_t::sample_rate()));
-    }
-
-    m_mipmap = std::make_unique<audio_pixel_mipmap_t>(m_track, pix_per_s_res);
-
-    m_active_channel = 0;
-  }
-
-  // moves to the prev take or track
-  HapticTrack prev();
-
-  // moves to the next take or track
-  HapticTrack next();
- 
-  void next_channel() {
-    m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels();
-  }
-
-  void prev_channel() {
-    m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels();
-  } 
-
-  void set_cursor(int mip_map_idx) {
-    double t = mip_map_idx / GetHZoomLevel();
-    SetEditCurPos(t, true, true);
-  }
-
-  void zoom(double amt) {
-    adjustZoom(GetHZoomLevel() * amt, 1, true, -1);
-  }
-
-  int get_active_channel() { return m_active_channel; }
-  
-  // returns the current track name
-  std::string get_track_name();
-
-  // returns the current take name
-  std::string get_take_name();
-
-  // moves the selected region by an amt
-  // TODO: implement me
-  void move();
-
-  // slices at current cursor position
-  // TODO: implement me
-  void slice();
-
-  // returns the pixels at the current resolution
-  audio_pixel_block_t get_pixels() {
-    // get the current resolution
-    double pix_per_s = GetHZoomLevel();
-
-    return m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
   }
 
 private:
-  MediaTrack* m_track {nullptr};
-  MediaItem* m_item {nullptr};
-  MediaItem_Take* m_take {nullptr};
+  // send the pixels, one by one,
+  // along w/ an index
+  void do_send() {
+    // wait for mip map to be ready
+    audio_pixel_block_t block = m_track.get_pixels();
+    const vec<audio_pixel_t>& pixels = block.get_pixels()
+                                        .at(m_track.get_active_channel());
+    for (int i = 0 ; i < pixels.size() ; i++) {
+      if (m_abort)
+        return;
 
-  int m_active_channel {0};
+      oscpkt::Message msg("/pixel");
+      json j;
+      j["id"] = i;
+      j["value"] = (abs(pixels.at(i).m_max) + abs(pixels.at(i).m_min) / 2.0);
 
-  std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
+      msg.pushStr(j.dump());
+      
+      // send the message
+      m_manager->send(msg);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
+
+  haptic_track_t& m_track;
+  shared_ptr<osc_manager_t> m_manager;
+  std::atomic<bool> m_abort;
+  std::thread m_worker;
 };
 
-class OSCController : IReaperControlSurface {
-  OSCController();
+class osc_controller_t : IReaperControlSurface {
+  osc_controller_t();
 public: 
-  OSCController(std::string& addr, int send_port, int recv_port)
-    : m_manager(std::make_unique<OSCManager>(addr, send_port, recv_port)) {}
+  osc_controller_t(std::string& addr, int send_port, int recv_port)
+    : m_manager(std::make_unique<osc_manager_t>(addr, send_port, recv_port)) {}
 
   virtual const char* GetTypeString() override { return "HapticScrubber"; }
   virtual const char* GetDescString() override { return "A tool for scrubbing audio using haptic feedback."; }
@@ -117,29 +84,27 @@ public:
     return success;
   }
 
-  virtual ~OSCController() {}
+  virtual ~osc_controller_t() {}
 
-  // TODO: should switch focus to last selected track
-  void OnTrackSelection(MediaTrack *trackid) override {};
+  void OnTrackSelection(MediaTrack *trackid) override {
+    // add the track to our map if we gotta
+    m_tracks.add(trackid);
+  };
 
+  // cancels any currently sending pixel stream 
+  // and sends a new one
   void send_pixel_update() {
-    audio_pixel_block_t interpolated_block = m_track->get_pixels();
-    const vec<audio_pixel_t>& pixels = interpolated_block.get_pixels()[m_track->get_active_channel()];
-
-    // send the pixels, one by one,
-    // along w/ an index
-    for (int i = 0 ; i < pixels.size() ; i++) {
-      oscpkt::Message msg("/pixel");
-      json j;
-      j["id"] = i;
-      j["value"] = pixels[i].m_max;
-
-      msg.pushStr(j.dump());
-      
-      // send the message
-      m_manager->send(msg);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // cancel any pixels we're currently sending
+    if (m_sender) {
+      m_sender->abort();
     }
+
+    m_sender.reset();
+    m_sender = std::make_unique<pixel_block_sender_t>(
+        m_tracks.active(), // TODO: maybe this should be a shared ptr
+        m_manager
+    );
+    m_sender->send();
   }
   
   // use this to register all callbacks with the osc manager
@@ -152,7 +117,7 @@ public:
       int index;
       if (msg.arg().popInt32(index)
                    .isOkNoMoreArgs()){
-        m_track->set_cursor(index);
+        m_tracks.active().set_cursor(index);
       }
     });
 
@@ -161,15 +126,14 @@ public:
       float amt;
       if (msg.arg().popFloat(amt)
                    .isOkNoMoreArgs()){
-        m_track->zoom((double)amt);
+        m_tracks.active().zoom((double)amt);
         send_pixel_update();
       }
     });
 
     m_manager->add_callback("/init",
     [this](Msg& msg){
-      m_track = std::make_unique<HapticTrack>();
-      
+      m_tracks.add(GetTrack(project, 0));
       send_pixel_update();
     });
   };
@@ -178,10 +142,12 @@ public:
   virtual void Run() override {
     // handle any packets
     m_manager->handle_receive(false);
+
+    // TODO: active track do any necessary updates here
   }
 
 private:
-  std::unique_ptr<OSCManager> m_manager {nullptr};
-  std::unique_ptr<HapticTrack> m_track;
-
+  shared_ptr<osc_manager_t> m_manager {nullptr};
+  haptic_track_map_t m_tracks;
+  unique_ptr<pixel_block_sender_t> m_sender;
 };

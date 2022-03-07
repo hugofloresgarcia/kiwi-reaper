@@ -5,15 +5,17 @@
 #include <stdio.h>
 #include <map>
 
+#pragma once
+
 // return true if you successfully handled the message
 // and popped all the arguments
 using OSCCallback = std::function<void(oscpkt::Message&)>;
 
-class OSCManager {
-  OSCManager();
+class osc_manager_t {
+  osc_manager_t();
 
 public:
-  OSCManager(std::string &addr, int send_port, int recv_port)
+  osc_manager_t(std::string &addr, int send_port, int recv_port)
     : m_addr(addr), m_send_port(send_port), m_recv_port(recv_port) {}
 
   bool init() {

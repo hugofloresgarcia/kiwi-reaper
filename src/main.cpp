@@ -22,7 +22,7 @@ static bool testAction(int commandId, int flat){
   return true;
 }
 
-static std::string ADDRESS = "172.16.7.137";
+static std::string ADDRESS = "192.168.0.198";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
@@ -75,9 +75,12 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(PCM_Source_GetPeaks, rec);
   REG_FUNC(SetMediaItemTakeInfo_Value, rec);
   REG_FUNC(SetMediaItemInfo_Value, rec);
+  REG_FUNC(GetTrack, rec);
+
+  REG_FUNC(ValidatePtr2, rec);
 
   // create controller
-  OSCController *controller = new OSCController(ADDRESS, SEND_PORT, RECV_PORT);
+  osc_controller_t *controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);
   if (!controller->init()) {
     ShowConsoleMsg("KIWI: failed to initialize OSC controller\n");
     return 0;

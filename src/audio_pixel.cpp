@@ -42,18 +42,19 @@ const vec<T> get_view(vec<T> const &parent, int start, int end)
 // ************* audio_pixel_block_t ****************
 
 void audio_pixel_block_t::to_json(json& j) const {
-    j = m_channel_pixels;
+    j = *m_channel_pixels;
 }
 
 void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, int sample_rate) {
     // constructs an audio pixel block using interleaved sample buffer and num channels
-    // clear the current set of audio pixels 
-    m_channel_pixels.clear();
+    // clear the current set of audio pixels
+    // TODO: don't reallocate if we don't need to
+    m_channel_pixels = std::make_shared<vec<vec<audio_pixel_t>>>();
 
     // initalize the m_channel_pixels to have empty audio pixel vectors
     for (int i = 0; i < num_channels; i++) {
         vec<audio_pixel_t> empty_pixel_vec;
-        m_channel_pixels.push_back(empty_pixel_vec);
+        m_channel_pixels->push_back(empty_pixel_vec);
     }
 
     //calcualte the samples per audio pixel and initalize an audio pixel
@@ -76,7 +77,7 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, i
                 curr_pixel.m_rms = sqrt(curr_pixel.m_rms / (samples_per_pixel - collected_samples));
 
                 // add the curr pixel to its channel in m_channel_pixels, clear curr_pixel
-                m_channel_pixels[channel].push_back(curr_pixel);
+                m_channel_pixels->at(channel).push_back(curr_pixel);
 
                 // reset pix
                 curr_pixel = audio_pixel_t();
@@ -104,9 +105,9 @@ audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> 
 
     audio_pixel_block_t output_block(m_pix_per_s);
 
-    for (int channel = 0; channel < m_channel_pixels.size(); channel++){
-        output_block.m_channel_pixels.push_back(
-            get_view(m_channel_pixels[channel], start_idx, end_idx)
+    for (int channel = 0; channel < m_channel_pixels->size(); channel++){
+        output_block.m_channel_pixels->push_back(
+            get_view(m_channel_pixels->at(channel), start_idx, end_idx)
         );
     }
 
@@ -131,7 +132,7 @@ audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) {
     audio_pixel_block_t new_block(new_pps);
 
     // iterate through our pixels to create new ones
-    for (auto& pix_channel : m_channel_pixels) {
+    for (auto& pix_channel : *m_channel_pixels) {
         // nearest pixels of the specfic channel 
         vec<audio_pixel_t> curr_pix_channel;
 
@@ -159,14 +160,14 @@ audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) {
 
             curr_pix_channel.push_back(curr_audio_pixel);
         }
-        new_block.m_channel_pixels.push_back(curr_pix_channel);
+        new_block.m_channel_pixels->push_back(curr_pix_channel);
     }
     return new_block;
 }
 
 // returns the number of pixels per each channel
 int audio_pixel_block_t::get_num_pix_per_channel() { 
-    return m_channel_pixels.empty() ? 0 : m_channel_pixels.front().size(); 
+    return m_channel_pixels->empty() ? 0 : m_channel_pixels->front().size(); 
 }
 
 // ************* audio_pixel_mipmap_t ****************
@@ -184,6 +185,7 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
 }
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
+    wait_until_ready();
     int nearest_pps = get_nearest_pps(pix_per_s);
 
      // bail early if we already have the given pps
@@ -203,7 +205,8 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     return *it;
 }
 
-bool audio_pixel_mipmap_t::flush() const {
+bool audio_pixel_mipmap_t::flush() {
+    wait_until_ready();
     json j;
     to_json(j);
     std::string resource_path = GetResourcePath();
@@ -218,7 +221,8 @@ bool audio_pixel_mipmap_t::flush() const {
     return true;
 }
 
-void audio_pixel_mipmap_t::to_json(json& j) const {
+void audio_pixel_mipmap_t::to_json(json& j) {
+    wait_until_ready();
     for (auto& map_entry : m_blocks) {
         j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
     }
@@ -242,21 +246,37 @@ void audio_pixel_mipmap_t::fill() {
     
     // calculate the number of samples we want to collect per channel
     int samples_per_channel = sample_rate() * (accessor_end_time - accessor_start_time);
-    vec<double> sample_buffer(samples_per_channel*num_channels());
+    shared_ptr<vec<double>> sample_buffer = 
+        std::make_shared<vec<double>>(samples_per_channel*num_channels());
 
     int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate(), num_channels(), 
                                                 accessor_start_time, samples_per_channel, 
-                                                sample_buffer.data());
+                                                sample_buffer->data());
+
 
     // samples stored in sample_buffer, operation status is returned
     if (!sample_status) {
         return; // TODO: LOG ME
     } 
 
-    // pass samples to update audio pixel blocks
-    for (auto& it : m_blocks) {
-        std::cout << std::to_string(it.first) << std::endl;
-        it.second.update(sample_buffer, num_channels(), sample_rate());
-    };
+    // finish whatever we had started already
+    if (m_worker.joinable()) 
+        m_worker.join();
+    
+    
+    m_ready = false;
+    m_worker = std::thread([this, sample_buffer](){
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            // pass samples to update audio pixel blocks
+            for (auto& it : m_blocks) {
+                std::cout << std::to_string(it.first) << std::endl;
+                it.second.update(*sample_buffer, num_channels(), sample_rate());
+            };
+        }
 
+        // let everybody know we're done updating
+        m_ready = true;
+        m_cv.notify_all();
+    });
 }
