@@ -50,13 +50,13 @@ private:
       oscpkt::Message msg("/pixel");
       json j;
       j["id"] = i;
-      j["value"] = (abs(pixels.at(i).m_max) + abs(pixels.at(i).m_min) / 2.0);
+      j["value"] = abs(pixels.at(i).m_max);
 
       msg.pushStr(j.dump());
       
       // send the message
       m_manager->send(msg);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      // std::this_thread::sleep_for(std::chrono::microseconds(10));
     }
   }
 

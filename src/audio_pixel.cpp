@@ -45,26 +45,23 @@ void audio_pixel_block_t::to_json(json& j) const {
     j = *m_channel_pixels;
 }
 
-void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, int sample_rate) {
-    // constructs an audio pixel block using interleaved sample buffer and num channels
-    // clear the current set of audio pixels
-    // TODO: don't reallocate if we don't need to
-    m_channel_pixels = std::make_shared<vec<vec<audio_pixel_t>>>();
-
-    // initalize the m_channel_pixels to have empty audio pixel vectors
-    for (int i = 0; i < num_channels; i++) {
-        vec<audio_pixel_t> empty_pixel_vec;
-        m_channel_pixels->push_back(empty_pixel_vec);
+void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, 
+                                 int sample_rate) {
+    // reallocate if we need to
+    int num_frames = sample_buffer.size() / num_channels;
+    m_channel_pixels->resize(num_channels);
+    for (auto& chan: *m_channel_pixels) {
+        chan.resize(num_frames);
     }
 
     //calcualte the samples per audio pixel and initalize an audio pixel
     int samples_per_pixel = sample_rate / m_pix_per_s;
 
     for (int channel = 0; channel < num_channels; channel++) {
-        audio_pixel_t curr_pixel = audio_pixel_t();
+        for (int i = 0; i < num_frames; i++) { 
 
-        for (int i = 0; i < sample_buffer.size(); i += num_channels) { 
-            double curr_sample = sample_buffer[i];
+            double curr_sample = sample_buffer.at(i*num_channels + channel);
+            audio_pixel_t& curr_pixel = (*m_channel_pixels).at(channel).at(i); 
     
             // update all fields of the current pixeld based on the current sample
             curr_pixel.m_max = std::max(curr_pixel.m_max, curr_sample);
@@ -73,20 +70,17 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, i
 
             int collected_samples = i % samples_per_pixel;
             if ((collected_samples == 0) || i == sample_buffer.size() - 1) {
-                // complete the RMS calculation, this method accounts of edge cases (total sample % samples per pixel != 0)
-                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / (samples_per_pixel - collected_samples));
-
-                // add the curr pixel to its channel in m_channel_pixels, clear curr_pixel
-                m_channel_pixels->at(channel).push_back(curr_pixel);
-
-                // reset pix
-                curr_pixel = audio_pixel_t();
+                // complete the RMS calculation, this method accounts 
+                // of edge cases (total sample % samples per pixel != 0)
+                curr_pixel.m_rms = sqrt(curr_pixel.m_rms / 
+                                        (samples_per_pixel - collected_samples));
             }
+
         }
     }
 }
 
-audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> t1) {
+const audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> t1) const {
     int block_size = get_num_pix_per_channel();
 
     // set start idx
@@ -103,7 +97,7 @@ audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> 
         block_size -1 // hi
     );
 
-    audio_pixel_block_t output_block(m_pix_per_s);
+    const audio_pixel_block_t output_block(m_pix_per_s);
 
     for (int channel = 0; channel < m_channel_pixels->size(); channel++){
         output_block.m_channel_pixels->push_back(
@@ -114,7 +108,7 @@ audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> 
     return output_block;
 }
 
-audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) {
+audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) const {
     // TODO: handle optionals here
     int new_num_pix = ceil(((get_num_pix_per_channel()) / m_pix_per_s) * new_pps);
 
@@ -166,7 +160,7 @@ audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) {
 }
 
 // returns the number of pixels per each channel
-int audio_pixel_block_t::get_num_pix_per_channel() { 
+int audio_pixel_block_t::get_num_pix_per_channel() const { 
     return m_channel_pixels->empty() ? 0 : m_channel_pixels->front().size(); 
 }
 
@@ -181,23 +175,25 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
     }
     m_block_pps = resolutions;
     std::sort(m_block_pps.begin(), m_block_pps.end());
-    fill();
+    update();
 }
 
-audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
-    wait_until_ready();
+audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) const {
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+
     int nearest_pps = get_nearest_pps(pix_per_s);
 
      // bail early if we already have the given pps
     if (nearest_pps == pix_per_s){
-        return m_blocks[nearest_pps].get_pixels(t0, t1);
+        return m_blocks.at(nearest_pps).get_pixels(t0, t1).clone();
     }
 
     // perform interpolation
-    return m_blocks[nearest_pps].get_pixels(t0, t1).interpolate(pix_per_s);
+    return m_blocks.at(nearest_pps).get_pixels(t0, t1).interpolate(pix_per_s);
 }
 
-double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
+// not thread-safe (needs lock)
+double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) const {
     auto const it = std::lower_bound(m_block_pps.begin(), m_block_pps.end(), pix_per_s);
     if (it == m_block_pps.end())
         return m_block_pps.back();
@@ -205,10 +201,12 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     return *it;
 }
 
-bool audio_pixel_mipmap_t::flush() {
-    wait_until_ready();
+bool audio_pixel_mipmap_t::flush() const {
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+
     json j;
     to_json(j);
+
     std::string resource_path = GetResourcePath();
     std::ofstream ofs;
     ofs.open(resource_path + "/kiwi-mipmap.json");
@@ -221,21 +219,18 @@ bool audio_pixel_mipmap_t::flush() {
     return true;
 }
 
-void audio_pixel_mipmap_t::to_json(json& j) {
-    wait_until_ready();
+void audio_pixel_mipmap_t::to_json(json& j) const {
+    std::shared_lock<std::shared_mutex> lock(m_mutex);
+
     for (auto& map_entry : m_blocks) {
         j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
     }
 }
 
+// update all blocks
+// MUST BE CALLED BY MAIN THREAD
+// due to reaper api calls: AudioAccessorUpdate
 void audio_pixel_mipmap_t::update() {
-    // update all blocks
-    // MUST BE CALLED BY MAIN THREAD
-    // due to reaper api calls: AudioAccessorUpdate
-    fill();
-};
-
-void audio_pixel_mipmap_t::fill() {
     // TODO: we do need to check the last updated time somehow
     AudioAccessor* safe_accessor = m_accessor.get();
 
@@ -258,25 +253,18 @@ void audio_pixel_mipmap_t::fill() {
     if (!sample_status) {
         return; // TODO: LOG ME
     } 
-
-    // finish whatever we had started already
-    if (m_worker.joinable()) 
-        m_worker.join();
     
-    
-    m_ready = false;
-    m_worker = std::thread([this, sample_buffer](){
+    m_pool.enqueue([this, sample_buffer](){
         {
-            std::unique_lock<std::mutex> lock(m_mutex);
+            std::unique_lock<std::shared_mutex> lock(m_mutex);
+            m_ready = false;
             // pass samples to update audio pixel blocks
             for (auto& it : m_blocks) {
                 std::cout << std::to_string(it.first) << std::endl;
                 it.second.update(*sample_buffer, num_channels(), sample_rate());
             };
+            m_ready = true;
         }
-
-        // let everybody know we're done updating
-        m_ready = true;
-        m_cv.notify_all();
     });
-}
+};
+

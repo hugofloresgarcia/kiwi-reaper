@@ -6,8 +6,9 @@
 #endif
 
 #include "include/json/json.hpp"
+#include "include/ThreadPool/ThreadPool.h"
 #include <vector> 
-#include <thread>
+#include <shared_mutex>
 
 #include "reaper_plugin_functions.h"
 
@@ -68,31 +69,36 @@ public:
 
 // stores one block of mipmapped audio data, at a particular sample rate
 // should be able to update when the samples are updated
+// not thread safe by itself
 class audio_pixel_block_t {
 public: 
-    audio_pixel_block_t() {
-        m_channel_pixels = std::make_shared<vec<vec<audio_pixel_t>>>();
-    };
+    audio_pixel_block_t() {};
     audio_pixel_block_t(double pix_per_s)
-        :m_pix_per_s(pix_per_s) {
-        m_channel_pixels = std::make_shared<vec<vec<audio_pixel_t>>>();
-    };
+        :m_pix_per_s(pix_per_s) {};
     ~audio_pixel_block_t() {};
+
+    audio_pixel_block_t clone() const {
+        audio_pixel_block_t block(*this);
+        block.m_channel_pixels = std::make_shared<
+                                    vec<vec<audio_pixel_t>>
+                                >(*m_channel_pixels);
+        return block;
+    }
 
     // returns a ref to the entire block of audio pixels
     const vec<vec<audio_pixel_t>>& get_pixels() const { return *m_channel_pixels; };
 
     // returns a VIEW (not a copy) of pixels for the specified time range
-    audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1);
+    const audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1) const;
 
     // creates a new block at a new resolution, via linear interpolation
-    audio_pixel_block_t interpolate(double new_pps);
+    audio_pixel_block_t interpolate(double new_pps) const;
 
     // gets the resolution (in pixels per second)
-    double get_pps() { return m_pix_per_s; };
+    double get_pps() const { return m_pix_per_s; };
     
     // number of pixels in a block (for a single channel)
-    int get_num_pix_per_channel();
+    int get_num_pix_per_channel() const;
 
     // fill a json object with a block
     void to_json(json& j) const;
@@ -103,7 +109,9 @@ public:
 
 private: 
     // vector of audio_pixels for each channel 
-    shared_ptr<vec<vec<audio_pixel_t>>> m_channel_pixels; 
+    shared_ptr<vec<vec<audio_pixel_t>>> m_channel_pixels {
+        std::make_shared<vec<vec<audio_pixel_t>>>()
+    }; 
 
     // pixels per second
     double m_pix_per_s {1.0};
@@ -112,36 +120,28 @@ private:
 // hold audio_pixel_block_t at different resolutions
 // and is able to interpolate between them to 
 // get audio pixels at any resolution inbetween
+// thread safe (will block if another thread is updating)
 class audio_pixel_mipmap_t {
 public:
     audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions);
-    ~audio_pixel_mipmap_t() {
-        if (m_worker.joinable())
-            m_worker.join();
-    }
 
-    // mm, how do we pass these pixels fast enough? lower resolutions will work well for fast inromation exchange 
-    audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, double pix_per_s);
+    // returns a copy of the block at the specified resolution
+    audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, 
+                                  double pix_per_s) const;
 
-    // use this to wait until mipmap is done updating
-    void wait_until_ready()  {
-        auto lock = std::unique_lock<std::mutex>(m_mutex);
-        printf("waiting for mipmap to be ready\n");
-        m_cv.wait(lock, [this]() { return ready(); });
-        printf("mipmap ready\n");
-    }
-    bool ready()  { return m_ready; };
-    
     // serialization and deserialization
-    bool flush() ; // flush contents to file
-    void to_json(json& j) ;
+    bool flush() const; // flush contents to file
+    void to_json(json& j) const ;
     void from_json(const json& j); // TODO: implement me 
 
     // update contents of the mipmap 
     // (if the audio accessor state has changed)
     void update();
+    bool ready() { return m_ready; };
 
-    int num_channels() { return (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN"); }
+    int num_channels() const { 
+        return (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN"); 
+    }
 
     static int sample_rate() {
         GetSetProjectInfo(0, "PROJECT_SRATE_USE", 1, true);
@@ -149,19 +149,18 @@ public:
     }
 
 private:
-    // fills all cached blocks with audio pixel data
-    void fill();
-
     // finds the lower bound of cached resolutions
-    double get_nearest_pps(double pix_per_s);
+    double get_nearest_pps(double pix_per_s) const;
 
     // create a new interpolated block from a source block
-    audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps, opt<double> t0, opt<double> t1);
+    audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps,
+                                                 opt<double> t0, opt<double> t1) const;
     
     // to get samples from the MediaItem_track
     safe_audio_accessor_t m_accessor; 
 
     // the lo-res pixel blocks
+    // TODO: these shouldn't be doubles
     std::map<double, audio_pixel_block_t, std::greater<double>> m_blocks;
 
     // sorted list of the blocks pps
@@ -170,8 +169,7 @@ private:
     // our parent media track
     MediaTrack* m_track {nullptr};
 
-    std::thread m_worker;
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
-    std::atomic<bool> m_ready { true };
+    ThreadPool m_pool {std::thread::hardware_concurrency()};
+    mutable std::shared_mutex m_mutex;
+    std::atomic<bool> m_ready {false};
 };
