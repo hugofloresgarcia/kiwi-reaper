@@ -12,6 +12,14 @@
 
 // audio pixel functions 
 
+int time_to_pixel_idx(double time, double pix_per_s) {
+    return floor((int)(time * pix_per_s));
+}
+
+double pixel_idx_to_time(int pixel_idx, double pix_per_s) {
+    return (double)pixel_idx / pix_per_s;
+}
+
 int pps_to_samples_per_pix(double pix_per_s, int sample_rate) {
     return ceil(sample_rate / pix_per_s);
 }
@@ -47,6 +55,7 @@ void audio_pixel_block_t::to_json(json& j) const {
 
 void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, 
                                  int sample_rate) {
+    debug("updating audio pixel block");
     // reallocate if we need to
     int num_frames = sample_buffer.size() / num_channels;
     m_channel_pixels->resize(num_channels);
@@ -81,7 +90,10 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 }
 
 const audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> t1) const {
+    debug("audio pixel block: getting pixels");
+
     int block_size = get_num_pix_per_channel();
+    debug("block size is {}", block_size);
 
     // set start idx
     int start_idx = std::clamp(
@@ -97,6 +109,9 @@ const audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<do
         block_size -1 // hi
     );
 
+    debug("retrieving {} pixels from {} to {}", end_idx - start_idx, start_idx, end_idx);
+    debug("current resolution is {} pixels per second", m_pix_per_s);
+
     const audio_pixel_block_t output_block(m_pix_per_s);
 
     for (int channel = 0; channel < m_channel_pixels->size(); channel++){
@@ -109,6 +124,8 @@ const audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<do
 }
 
 audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) const {
+    debug("creating interpolated audio pixel block with resolution {}", new_pps);
+
     // TODO: handle optionals here
     int new_num_pix = ceil(((get_num_pix_per_channel()) / m_pix_per_s) * new_pps);
 
@@ -168,8 +185,14 @@ int audio_pixel_block_t::get_num_pix_per_channel() const {
 
 audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions)
     :m_accessor(safe_audio_accessor_t(track)), m_track(track) {
+    
+    info("creating audio pixel mipmap for track {:x}", 
+          (void*)m_track);
 
-    if (!m_accessor.is_valid()) { return; }
+    if (!m_accessor.is_valid()) {
+        info("got invalid audio accessor for track {:x}", (void*)m_track);
+        return; 
+    }
     for (double res : resolutions) {
         m_blocks[res] = audio_pixel_block_t(res);
     }
@@ -180,6 +203,7 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) const {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
+    debug("mipmap: getting pixels for range {} to {} with resolution {}", t0.value(), t1.value(), pix_per_s);
 
     int nearest_pps = get_nearest_pps(pix_per_s);
 
@@ -201,6 +225,7 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) const {
     return *it;
 }
 
+// thread safe
 bool audio_pixel_mipmap_t::flush() const {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
 
@@ -219,6 +244,7 @@ bool audio_pixel_mipmap_t::flush() const {
     return true;
 }
 
+// thread safe
 void audio_pixel_mipmap_t::to_json(json& j) const {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
 
@@ -231,11 +257,14 @@ void audio_pixel_mipmap_t::to_json(json& j) const {
 // MUST BE CALLED BY MAIN THREAD
 // due to reaper api calls: AudioAccessorUpdate
 void audio_pixel_mipmap_t::update() {
+    debug("mipmap: updating mipmap");
+
     // TODO: we do need to check the last updated time somehow
     AudioAccessor* safe_accessor = m_accessor.get();
 
     double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
     double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
+    debug("mipmap: accessor start time {} end time {}", accessor_start_time, accessor_end_time);
 
     // get sample rate
     
@@ -244,6 +273,8 @@ void audio_pixel_mipmap_t::update() {
     shared_ptr<vec<double>> sample_buffer = 
         std::make_shared<vec<double>>(samples_per_channel*num_channels());
 
+    // TODO: can we do this from a worker thread? 
+    // if not, is it too slow and will we have a problem? 
     int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate(), num_channels(), 
                                                 accessor_start_time, samples_per_channel, 
                                                 sample_buffer->data());
@@ -251,12 +282,15 @@ void audio_pixel_mipmap_t::update() {
 
     // samples stored in sample_buffer, operation status is returned
     if (!sample_status) {
+        debug("mipmap: failed to get samples from accessor");
         return; // TODO: LOG ME
     } 
     
     m_pool.enqueue([this, sample_buffer](){
         {
             std::unique_lock<std::shared_mutex> lock(m_mutex);
+            
+            debug("mipmap: updating mipmap in worker thread");
             m_ready = false;
             // pass samples to update audio pixel blocks
             for (auto& it : m_blocks) {
@@ -264,6 +298,7 @@ void audio_pixel_mipmap_t::update() {
                 it.second.update(*sample_buffer, num_channels(), sample_rate());
             };
             m_ready = true;
+            debug("mipmap: finished updating mipmap in worker thread");
         }
     });
 };

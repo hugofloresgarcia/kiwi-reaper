@@ -22,7 +22,7 @@ static bool testAction(int commandId, int flat){
   return true;
 }
 
-static std::string ADDRESS = "192.168.0.13";
+static std::string ADDRESS = "192.168.0.21";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
@@ -78,6 +78,11 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(GetTrack, rec);
 
   REG_FUNC(ValidatePtr2, rec);
+
+  // create log file
+  std::string resource_path = GetResourcePath();
+  std::string log_path = resource_path + "/kiwi-log.txt";
+  kiwi_logger_init(log_path);
 
   // create controller
   osc_controller_t *controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);

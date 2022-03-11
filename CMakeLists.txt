@@ -39,30 +39,38 @@ STRING(TOLOWER "${ARCH_NAME}" ARCH_NAME)
 
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME kiwi) # avoid an empty "Unspecified" component
 
-
 add_library(kiwi SHARED
     include/oscpkt/oscpkt.hh
     include/oscpkt/udp.hh
     include/json/json.hpp
     src/audio_pixel.h
     src/audio_pixel.cpp
-    src/haptic_track.h
     src/controller.h
-    src/osc.h
+    src/haptic_track.h
     src/main.cpp
+    src/log.h
+    src/osc.h
 )
   
 target_include_directories(kiwi PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/spdlog
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor/reaper-sdk/sdk
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # add WDL
-# list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/wdl)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/wdl)
 find_package(WDL REQUIRED)
-target_link_libraries(kiwi WDL::WDL)
+
+# set(spdlog_DIR ${CMAKE_SOURCE_DIR}/spdlog/cmake)
+# list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
+add_subdirectory(spdlog)
+# list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
+# find_package(spdlog REQUIRED)
+
+target_link_libraries(kiwi WDL::WDL spdlog::spdlog_header_only)
 set_target_properties(kiwi PROPERTIES
   PREFIX "" # disable the "lib" prefix
   OUTPUT_NAME "reaper_kiwi-${ARCH_NAME}"

@@ -1,12 +1,15 @@
+#pragma once
+
 #include "audio_pixel.h"
 #include "haptic_track.h"
 #include "osc.h"
+#include "log.h"
+
 #include <thread>
 #include <queue>
 
 #define project nullptr
 
-#pragma once
 
 using std::unique_ptr;
 
@@ -19,6 +22,7 @@ public:
 
   void send(bool block = false) {
     if (!block) {
+      debug("initing worker thread for pixel send");
       m_worker = std::thread(&pixel_block_sender_t::do_send, this);
     } else {
       do_send();
@@ -40,12 +44,17 @@ private:
   // along w/ an index
   void do_send() {
     // wait for mip map to be ready
+    debug("inside worker thread, sending pixels");
+
     audio_pixel_block_t block = m_track.get_pixels();
     const vec<audio_pixel_t>& pixels = block.get_pixels()
                                         .at(m_track.get_active_channel());
     for (int i = 0 ; i < pixels.size() ; i++) {
       if (m_abort)
+      {
+        debug("pixel send aborted, exiting");
         return;
+      }
 
       oscpkt::Message msg("/pixel");
       json j;
@@ -56,7 +65,7 @@ private:
       
       // send the message
       m_manager->send(msg);
-      // std::this_thread::sleep_for(std::chrono::microseconds(10));
+      std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
   }
 
@@ -94,17 +103,21 @@ public:
   // cancels any currently sending pixel stream 
   // and sends a new one
   void send_pixel_update() {
+    info("sending pixel update to remote");
     // cancel any pixels we're currently sending
     if (m_sender) {
+      info("found another pixel sender already running. aborting the current sender");
       m_sender->abort();
     }
 
     m_sender.reset();
+    debug("creating new pixel sender");
     m_sender = std::make_unique<pixel_block_sender_t>(
         m_tracks.active(), // TODO: maybe this should be a shared ptr
         m_manager
     );
     m_sender->send();
+    debug("pixel sender sent!");
   }
   
   // use this to register all callbacks with the osc manager
@@ -117,7 +130,9 @@ public:
       int index;
       if (msg.arg().popInt32(index)
                    .isOkNoMoreArgs()){
+        info("received /set_cursor to {}", index);
         m_tracks.active().set_cursor(index);
+        send_pixel_update();
       }
     });
 
@@ -126,6 +141,7 @@ public:
       float amt;
       if (msg.arg().popFloat(amt)
                    .isOkNoMoreArgs()){
+        info("received /zoom {} from remote controller", amt);
         m_tracks.active().zoom((double)amt);
         send_pixel_update();
       }
@@ -133,6 +149,7 @@ public:
 
     m_manager->add_callback("/init",
     [this](Msg& msg){
+      info("received /init from remote controller");
       m_tracks.add(GetTrack(project, 0));
       send_pixel_update();
     });

@@ -1,3 +1,4 @@
+#pragma once
 #include "include/oscpkt/oscpkt.hh"
 #include "include/oscpkt/udp.hh"
 
@@ -5,7 +6,7 @@
 #include <stdio.h>
 #include <map>
 
-#pragma once
+#include "log.h"
 
 // return true if you successfully handled the message
 // and popped all the arguments
@@ -34,6 +35,7 @@ public:
 
       // pop as many messages as are in the packet
       while (reader.isOk() && (msg = reader.popMessage()) != 0) {
+        debug("osc message received: {}", msg->addressPattern());
         for (const auto &pair : m_callbacks){
           // only call if pattern matches
           if (msg->match(pair.first).isOk())

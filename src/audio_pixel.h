@@ -1,3 +1,5 @@
+#pragma once
+
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 
 #ifdef _WIN32
@@ -12,7 +14,8 @@
 
 #include "reaper_plugin_functions.h"
 
-#pragma once
+#include "log.h"
+
 
 using json = nlohmann::json;
 
@@ -24,7 +27,9 @@ using opt = std::optional<T>;
 
 using std::shared_ptr;
 
-// forward declarations
+// helpers!
+int time_to_pixel_idx(double time, double pix_per_s);
+double pixel_idx_to_time(int pixel_idx, double pix_per_s);
 int pps_to_samples_per_pix(double pix_per_s, int sample_rate);
 double samples_per_pix_to_pps(int samples_per_pix, int sample_rate);
 double linear_interp(double x, double x1, double x2, double y1, double y2);
@@ -169,7 +174,11 @@ private:
     // our parent media track
     MediaTrack* m_track {nullptr};
 
-    ThreadPool m_pool {std::thread::hardware_concurrency()};
+    ThreadPool m_pool {
+        std::clamp(
+            std::thread::hardware_concurrency(), 1u, 10u
+        )
+    };
     mutable std::shared_mutex m_mutex;
     std::atomic<bool> m_ready {false};
 };
