@@ -54,7 +54,7 @@ add_library(kiwi SHARED
   
 target_include_directories(kiwi PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/spdlog
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/spdlog
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor/reaper-sdk/sdk
   ${CMAKE_CURRENT_BINARY_DIR}
@@ -66,11 +66,11 @@ find_package(WDL REQUIRED)
 
 # set(spdlog_DIR ${CMAKE_SOURCE_DIR}/spdlog/cmake)
 # list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
-add_subdirectory(spdlog)
+# add_subdirectory(${CMAKE_SOURCE_DIR}/include/spdlog)
 # list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
 # find_package(spdlog REQUIRED)
 
-target_link_libraries(kiwi WDL::WDL spdlog::spdlog_header_only)
+target_link_libraries(kiwi WDL::WDL)
 set_target_properties(kiwi PROPERTIES
   PREFIX "" # disable the "lib" prefix
   OUTPUT_NAME "reaper_kiwi-${ARCH_NAME}"
