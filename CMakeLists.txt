@@ -64,12 +64,6 @@ target_include_directories(kiwi PRIVATE
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/wdl)
 find_package(WDL REQUIRED)
 
-# set(spdlog_DIR ${CMAKE_SOURCE_DIR}/spdlog/cmake)
-# list(APPEND CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
-# add_subdirectory(${CMAKE_SOURCE_DIR}/include/spdlog)
-# list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/spdlog/cmake)
-# find_package(spdlog REQUIRED)
-
 target_link_libraries(kiwi WDL::WDL)
 set_target_properties(kiwi PROPERTIES
   PREFIX "" # disable the "lib" prefix

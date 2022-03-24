@@ -5,7 +5,6 @@
 
 #include "reaper_plugin_functions.h"
 
-
 using std::unordered_map;
 
 // TODO: we're gonna need to figure out how to find out 
@@ -43,12 +42,6 @@ public:
   void next_channel() { m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels(); }
   void prev_channel() { m_active_channel = (m_active_channel - 1) % m_mipmap->num_channels(); } 
   int get_active_channel() {  return m_active_channel; }
-  
-  // returns the current track name
-  std::string get_track_name();
-  std::string get_take_name();
-
-  int get_pixel_frame_width() { return m_pixel_frame_width; }
 
   // moves the selected region by an amt
   // TODO: implement me
@@ -67,26 +60,15 @@ public:
       debug("no mipmap for track {:x}", (void*)m_track);
       return audio_pixel_block_t();
     }
-    // get the current resolution
     double pix_per_s = GetHZoomLevel();
 
-    // get the current cursor position
-    double curr_t = GetCursorPosition();
-
-    // the mipmap should be able to do the clamping against the track length
-    int center_idx = time_to_pixel_idx(curr_t, pix_per_s);
-    int left_idx = std::max(0, center_idx - m_pixel_frame_width / 2);
-    int right_idx = center_idx + m_pixel_frame_width / 2;
-
-    double t0 = pixel_idx_to_time(left_idx, pix_per_s);
-    double t1 = pixel_idx_to_time(right_idx, pix_per_s);
-
-    return m_mipmap->get_pixels(t0, t1, pix_per_s);
+    return m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
   }
 
   static void set_cursor(int mip_map_idx) {
     double t = mip_map_idx / GetHZoomLevel();
     debug("setting cursor to mipmap index {}, at time {}", mip_map_idx, t);
+    SetEditCurPos(0, true, true);
     SetEditCurPos(t, true, true);
   }
 
@@ -112,7 +94,6 @@ private:
   MediaItem_Take* m_take {nullptr};
 
   int m_active_channel {0};
-  int m_pixel_frame_width {512};
 
   std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
 };
@@ -123,7 +104,7 @@ public:
   haptic_track_t& active() { 
     // TODO: check that the track we're returning actually 
     // still exists
-    debug("returning active haptic track with index: {}", active_track);
+    // debug("returning active haptic track with index: {}", active_track);
     return tracks[active_track]; 
   };
 

@@ -18,11 +18,11 @@
 #include "controller.h"
 
 static bool testAction(int commandId, int flat){
-  ShowConsoleMsg("hello world!\n");
+  
   return true;
 }
 
-static std::string ADDRESS = "192.168.0.21";
+static std::string ADDRESS = "192.168.0.198";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 

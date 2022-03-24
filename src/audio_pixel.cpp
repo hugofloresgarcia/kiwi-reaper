@@ -203,7 +203,7 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) const {
     std::shared_lock<std::shared_mutex> lock(m_mutex);
-    debug("mipmap: getting pixels for range {} to {} with resolution {}", t0.value(), t1.value(), pix_per_s);
+    debug("mipmap: getting pixels for range {} to {} with resolution {}", t0.value_or(0), t1.value_or(-1), pix_per_s);
 
     int nearest_pps = get_nearest_pps(pix_per_s);
 

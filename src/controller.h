@@ -10,7 +10,6 @@
 
 #define project nullptr
 
-
 using std::unique_ptr;
 
 class pixel_block_sender_t {
@@ -47,6 +46,12 @@ private:
     debug("inside worker thread, sending pixels");
 
     audio_pixel_block_t block = m_track.get_pixels();
+
+    if (block.get_pixels().empty()) {
+      debug("no pixels to send");
+      return;
+    }
+
     const vec<audio_pixel_t>& pixels = block.get_pixels()
                                         .at(m_track.get_active_channel());
     for (int i = 0 ; i < pixels.size() ; i++) {
@@ -59,7 +64,7 @@ private:
       oscpkt::Message msg("/pixel");
       json j;
       j["id"] = i;
-      j["value"] = abs(pixels.at(i).m_max);
+      j["value"] = abs(pixels.at(i).m_max) + abs(pixels.at(i).m_min);
 
       msg.pushStr(j.dump());
       
@@ -104,6 +109,7 @@ public:
   // and sends a new one
   void send_pixel_update() {
     info("sending pixel update to remote");
+
     // cancel any pixels we're currently sending
     if (m_sender) {
       info("found another pixel sender already running. aborting the current sender");
@@ -132,7 +138,6 @@ public:
                    .isOkNoMoreArgs()){
         info("received /set_cursor to {}", index);
         m_tracks.active().set_cursor(index);
-        send_pixel_update();
       }
     });
 
@@ -143,6 +148,7 @@ public:
                    .isOkNoMoreArgs()){
         info("received /zoom {} from remote controller", amt);
         m_tracks.active().zoom((double)amt);
+
         send_pixel_update();
       }
     });
@@ -151,6 +157,8 @@ public:
     [this](Msg& msg){
       info("received /init from remote controller");
       m_tracks.add(GetTrack(project, 0));
+      // set cursor to 0
+      m_tracks.active().set_cursor(0);
       send_pixel_update();
     });
   };
