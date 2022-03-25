@@ -47,6 +47,7 @@ add_library(kiwi SHARED
     src/audio_pixel.cpp
     src/controller.h
     src/haptic_track.h
+    src/senders.h
     src/main.cpp
     src/log.h
     src/osc.h

@@ -34,6 +34,9 @@ int pps_to_samples_per_pix(double pix_per_s, int sample_rate);
 double samples_per_pix_to_pps(int samples_per_pix, int sample_rate);
 double linear_interp(double x, double x1, double x2, double y1, double y2);
 
+template<typename T>
+const vec<T> get_view(vec<T> const &parent, int start, int end);
+
 // wraps an audio accessor
 class safe_audio_accessor_t {
 public:

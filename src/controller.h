@@ -2,83 +2,13 @@
 
 #include "audio_pixel.h"
 #include "haptic_track.h"
+#include "senders.h"
 #include "osc.h"
 #include "log.h"
-
-#include <thread>
-#include <queue>
 
 #define project nullptr
 
 using std::unique_ptr;
-
-class pixel_block_sender_t {
-public:
-  pixel_block_sender_t(haptic_track_t& track,
-                       shared_ptr<osc_manager_t> manager) 
-      : m_track(track), m_manager(manager) { }
-
-
-  void send(bool block = false) {
-    if (!block) {
-      debug("initing worker thread for pixel send");
-      m_worker = std::thread(&pixel_block_sender_t::do_send, this);
-    } else {
-      do_send();
-    }
-  }
-
-  void abort () {
-    m_abort = true;
-  }
-
-  ~pixel_block_sender_t() {
-    if (m_worker.joinable()) {
-      m_worker.join();
-    }
-  }
-
-private:
-  // send the pixels, one by one,
-  // along w/ an index
-  void do_send() {
-    // wait for mip map to be ready
-    debug("inside worker thread, sending pixels");
-
-    audio_pixel_block_t block = m_track.get_pixels();
-
-    if (block.get_pixels().empty()) {
-      debug("no pixels to send");
-      return;
-    }
-
-    const vec<audio_pixel_t>& pixels = block.get_pixels()
-                                        .at(m_track.get_active_channel());
-    for (int i = 0 ; i < pixels.size() ; i++) {
-      if (m_abort)
-      {
-        debug("pixel send aborted, exiting");
-        return;
-      }
-
-      oscpkt::Message msg("/pixel");
-      json j;
-      j["id"] = i;
-      j["value"] = abs(pixels.at(i).m_max) + abs(pixels.at(i).m_min);
-
-      msg.pushStr(j.dump());
-      
-      // send the message
-      m_manager->send(msg);
-      std::this_thread::sleep_for(std::chrono::microseconds(1));
-    }
-  }
-
-  haptic_track_t& m_track;
-  shared_ptr<osc_manager_t> m_manager;
-  std::atomic<bool> m_abort;
-  std::thread m_worker;
-};
 
 class osc_controller_t : IReaperControlSurface {
   osc_controller_t();
@@ -118,9 +48,10 @@ public:
 
     m_sender.reset();
     debug("creating new pixel sender");
-    m_sender = std::make_unique<pixel_block_sender_t>(
+    m_sender = std::make_unique<block_pixel_sender_t>(
         m_tracks.active(), // TODO: maybe this should be a shared ptr
-        m_manager
+        m_manager, 
+        128
     );
     m_sender->send();
     debug("pixel sender sent!");
@@ -174,5 +105,5 @@ public:
 private:
   shared_ptr<osc_manager_t> m_manager {nullptr};
   haptic_track_map_t m_tracks;
-  unique_ptr<pixel_block_sender_t> m_sender;
+  unique_ptr<block_pixel_sender_t> m_sender;
 };
