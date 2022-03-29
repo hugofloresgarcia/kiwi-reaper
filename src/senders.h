@@ -32,7 +32,9 @@ public:
     void send(bool block = false) {
         if (!block) {
             debug("initing worker thread for pixel send");
-            m_worker = std::thread(&pixel_sender_t::do_send, this);
+            m_workers.emplace_back(
+                std::thread(&pixel_sender_t::do_send, this)
+            );
         } else {
             do_send();
         }
@@ -43,18 +45,25 @@ public:
     }
 
     ~pixel_sender_t() {
-        if (m_worker.joinable()) {
-            m_worker.join();
+        for (auto& worker: m_workers) {
+            if (worker.joinable()) {
+                worker.join();
+            }
         }
     }
 
+    const haptic_track_t& track() {
+        return m_track;
+    }
+
 protected:
+    // implement me!
     virtual void do_send() = 0;
 
     haptic_track_t& m_track;
     shared_ptr<osc_manager_t> m_manager;
     std::atomic<bool> m_abort;
-    std::thread m_worker;
+    std::deque<std::thread> m_workers;
 };
 
 
@@ -124,47 +133,105 @@ public:
     {}
 
 private:
+    using range = std::pair<size_t, size_t>;
+
+    range get_send_range(const vec<audio_pixel_t>& pixels) {
+        // find the current cursor position
+        int center_idx = m_track.get_cursor_mip_map_idx();
+
+        // find the start and end indices
+        int start_idx = std::clamp(center_idx - (int)m_block_size / 2, 0, (int)pixels.size());
+        int end_idx = std::clamp(center_idx + (int)m_block_size / 2 - 1, start_idx, (int)pixels.size());
+
+        range trimmed_range = trim_block_if_sent(range(start_idx, end_idx));
+        return trimmed_range;
+    }
+
     void do_send() override {
         // wait for mip map to be ready
         debug("inside worker thread, sending pixels");
 
-        audio_pixel_block_t block = m_track.get_pixels();
+        if (m_block.get_pixels().empty()) {
+            {
+                std::unique_lock<std::shared_mutex> lock(m_mutex);
+                m_block = m_track.get_pixels();
+            }
+        }
 
-        if (block.get_pixels().empty()) {
+        std::shared_lock<std::shared_mutex> lock(m_mutex);
+
+        if (m_block.get_pixels().empty()) {
             debug("no pixels to send");
             return;
         }
 
-        const vec<audio_pixel_t>& pixels = block.get_pixels()
+        const vec<audio_pixel_t>& pixels = m_block.get_pixels()
                                                 .at(m_track.get_active_channel());
 
-        for (int start_idx = 0; start_idx < pixels.size() ;
-             start_idx = start_idx + m_block_size) {
-            
-            if (m_abort)
-            {
-                debug("pixel send aborted, exiting");
-                return;
-            }
+        range send_range = get_send_range(pixels);
 
-            const vec<audio_pixel_t>& sub_block = get_view(pixels, start_idx, start_idx + m_block_size);
-            vec<audio_haptic_pixel_t> haptic_block(sub_block.size());
-            for (int i = 0 ; i < sub_block.size() ; i++) {
-                haptic_block.at(i) = audio_haptic_pixel_t(i, sub_block.at(i));
-            }
-
-            oscpkt::Message msg("/pixels");
-            json j;
-            j["startIdx"] = start_idx;
-            j["pixels"] = haptic_block;
-
-            msg.pushStr(j.dump());
-
-            // send the message
-            m_manager->send(msg);
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        if ((send_range.second - send_range.first) == 0) {
+            debug("no pixels to send");
+            return;
         }
+
+        m_sent_blocks.emplace_back(send_range);
+
+        // get a temporary view of the sub block we're sending
+        const vec<audio_pixel_t>& sub_block = get_view(pixels, send_range.first, send_range.second);
+
+        // convert audio pixels to haptic pixels
+        vec<audio_haptic_pixel_t> haptic_block(sub_block.size());
+        for (int i = 0 ; i < sub_block.size() ; i++) {
+            haptic_block.at(i) = audio_haptic_pixel_t(i, sub_block.at(i));
+        }
+
+        // abort before we send if we we're asked to abort
+        if (m_abort)
+        {
+            debug("pixel send aborted, exiting");
+            return;
+        }
+
+        // prep the message!
+        oscpkt::Message msg("/pixels");
+        json j;
+        j["startIdx"] = send_range.first;
+        j["pixels"] = haptic_block;
+
+        msg.pushStr(j.dump());
+
+        // send the message
+        m_manager->send(msg);
+
     };
 
+    // clamp around the edges of the block, if the edges of the block have already been sent
+    // will return  (-1, -1) if the block needn't be sent at all (completely intersects)
+    // a block that we have already sent
+    std::pair<size_t, size_t> trim_block_if_sent(range inblock) {
+        for (const auto& block : m_sent_blocks) {
+            if (range_intersects_before(inblock, block)) {
+                inblock.first = block.second;
+            }
+            if (range_intersects_before(block, inblock)) {
+                inblock.second = block.first;
+            }
+            if (inblock.first >= inblock.second) {
+                return {0, 0};
+            }
+        }
+        return inblock;
+    }
+
+    bool range_intersects_before(range a, range b) {
+        return a.first < b.second && b.first < a.second;
+    }
+    
     size_t m_block_size;
+    std::vector<range> m_sent_blocks;
+
+    std::shared_mutex m_mutex;
+    audio_pixel_block_t m_block;
 };
+

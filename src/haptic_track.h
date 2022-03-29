@@ -72,9 +72,20 @@ public:
     SetEditCurPos(t, true, true);
   }
 
+  static int get_cursor_mip_map_idx() {
+    double t = GetCursorPosition();
+    int mip_map_idx = floor(t * GetHZoomLevel());
+    debug("getting cursor position, returning mipmap index {}", mip_map_idx);
+    return mip_map_idx;
+  }
+
   static void zoom(double amt) {
     debug("zooming by {}", amt);
     adjustZoom(GetHZoomLevel() * amt, 1, true, -1);
+  }
+
+  int get_track_number() const {
+    return get_track_number(m_track);
   }
 
   //  track number 1-based, 0=not found, -1=master track (read-only, returns the int directly)
