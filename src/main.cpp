@@ -10,6 +10,8 @@
 #define BAIL_IF_NO_REG(x) if (!x) { std::cerr<<"failed to register function "<<x<<std::endl; return 0; }
 #define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x) ; BAIL_IF_NO_REG(x) ;
 
+#include "include/bonjour/dns_sd.h"
+
 #include "reaper_plugin_functions.h"
 #include <cstdio>
 #include <string>
@@ -90,6 +92,9 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   if (!rec->Register("csurf_inst", (void *)controller))
     return 0;
 
+  DNSServiceRef* kiwi_service_ref;
+  DNSServiceRegister(kiwi_service_ref, 0, 0, "kiwi-reaper", "_test._tcp", NULL, NULL, 8080, 0, NULL, NULL, NULL);
+  
   // initialization code here
 
   return 1;
