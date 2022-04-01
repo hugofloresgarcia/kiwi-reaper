@@ -52,12 +52,17 @@ add_library(kiwi SHARED
     src/log.h
     src/osc.h
 )
-  
+
+target_link_libraries(kiwi 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bonjour/dnssd.lib
+)
+
 target_include_directories(kiwi PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/include/spdlog
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor
   ${CMAKE_CURRENT_SOURCE_DIR}/vendor/reaper-sdk/sdk
+  ${CMAKE_CURRENT_BINARY_DIR}/include/bonjour
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
