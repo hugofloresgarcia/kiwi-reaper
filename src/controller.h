@@ -10,6 +10,19 @@
 
 using std::unique_ptr;
 
+void controller_browse_replies(
+                            DNSServiceRef                       sd_ref,
+                            DNSServiceFlags                     flags,
+                            uint32_t                            interface_idx,
+                            DNSServiceErrorType                 error_code,
+                            const char                          *service_name,
+                            const char                          *regtype,
+                            const char                          *reply_domain,
+                            void                                *context){
+    spdlog::info(service_name);
+    return;
+}
+
 class osc_controller_t : IReaperControlSurface {
 
     osc_controller_t();
@@ -110,13 +123,30 @@ public:
 
     // this runs about 30x per second. do all OSC polling here
     virtual void Run() override {
-        // handle any packets
-        m_manager->handle_receive(false);
+        if (m_connection_status) {
+            // handle any packets
+            m_manager->handle_receive(false);
+        }
+
+        else {
+            spdlog::info("starting the browsing...");
+            // TODO: add some kind of delay when checking this 
+            // TODO: this gives the user timeto actually open app
+            DNSServiceRef service_browse_record;
+            int browse_record_status = DNSServiceBrowse(&service_browse_record, 
+                                                        0, 0, "_test._tcp", NULL,
+                                                        controller_browse_replies, 
+                                                        NULL);
+
+            if (browse_record_status != kDNSServiceErr_NoError) 
+                std::cerr<<"Failed to discover devices. "<<std::endl;
+        }
 
         // TODO: active track do any necessary updates here
     }
 
 private:
+    bool m_connection_status {false};
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     unique_ptr<block_pixel_sender_t> m_sender;
