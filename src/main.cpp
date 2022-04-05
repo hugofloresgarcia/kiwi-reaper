@@ -17,7 +17,7 @@
 
 #include "controller.h"
 
-static std::string ADDRESS = "192.168.0.198";
+static std::string ADDRESS = "10.105.97.154";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 

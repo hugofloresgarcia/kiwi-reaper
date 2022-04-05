@@ -57,22 +57,26 @@ void audio_pixel_block_t::to_json(json& j) const {
 
 void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels, 
                                  int sample_rate) {
-    debug("updating audio pixel block");
-    // reallocate if we need to
-    int num_frames = sample_buffer.size() / num_channels;
-    m_channel_pixels->resize(num_channels);
-    for (auto& chan: *m_channel_pixels) {
-        chan.resize(num_frames);
-    }
+    debug("updating audio pixel block with pps {}", m_pix_per_s);
 
     //calcualte the samples per audio pixel and initalize an audio pixel
     int samples_per_pixel = sample_rate / m_pix_per_s;
 
-    for (int channel = 0; channel < num_channels; channel++) {
-        for (int i = 0; i < num_frames; i++) { 
+    // reallocate if we need to
+    int num_samples_per_channel = sample_buffer.size() / num_channels;
+    m_channel_pixels->resize(num_channels);
+    for (auto& chan: *m_channel_pixels) {
+        chan.resize(ceil(num_samples_per_channel / samples_per_pixel));
+    }
 
+    int pixel_idx = 0;
+    for (int channel = 0; channel < num_channels; channel++) {
+        debug("processing channel {}", channel);
+        for (int i = 0; i < num_samples_per_channel; i++) {
+            debug("processing sample {} ", i);
             double curr_sample = sample_buffer.at(i*num_channels + channel);
-            audio_pixel_t& curr_pixel = (*m_channel_pixels).at(channel).at(i); 
+
+            audio_pixel_t& curr_pixel = (*m_channel_pixels).at(channel).at(pixel_idx); 
     
             // update all fields of the current pixeld based on the current sample
             curr_pixel.m_max = std::max(curr_pixel.m_max, curr_sample);
@@ -81,14 +85,16 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 
             int collected_samples = i % samples_per_pixel;
             if ((collected_samples == 0) || i == sample_buffer.size() - 1) {
+                debug("pixel {} collected", pixel_idx);
                 // complete the RMS calculation, this method accounts 
                 // of edge cases (total sample % samples per pixel != 0)
                 curr_pixel.m_rms = sqrt(curr_pixel.m_rms / 
                                         (samples_per_pixel - collected_samples));
+                pixel_idx++;
             }
-
         }
     }
+    debug("DONE updating audio pixel block with pps {}", m_pix_per_s);
 }
 
 const audio_pixel_block_t audio_pixel_block_t::get_pixels(opt<double> t0, opt<double> t1) const {
@@ -203,8 +209,8 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
     update();
 }
 
-audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) const {
-    std::shared_lock<std::shared_mutex> lock(m_mutex);
+audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
+    std::lock_guard<std::mutex> lock(m_mutex);
     debug("mipmap: getting pixels for range {} to {} with resolution {}", t0.value_or(0), t1.value_or(-1), pix_per_s);
 
     int nearest_pps = get_nearest_pps(pix_per_s);
@@ -219,7 +225,7 @@ audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double>
 }
 
 // not thread-safe (needs lock)
-double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) const {
+double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
     auto const it = std::lower_bound(m_block_pps.begin(), m_block_pps.end(), pix_per_s);
     if (it == m_block_pps.end())
         return m_block_pps.back();
@@ -228,8 +234,8 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) const {
 }
 
 // thread safe
-bool audio_pixel_mipmap_t::flush() const {
-    std::shared_lock<std::shared_mutex> lock(m_mutex);
+bool audio_pixel_mipmap_t::flush(){
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     json j;
     to_json(j);
@@ -247,8 +253,8 @@ bool audio_pixel_mipmap_t::flush() const {
 }
 
 // thread safe
-void audio_pixel_mipmap_t::to_json(json& j) const {
-    std::shared_lock<std::shared_mutex> lock(m_mutex);
+void audio_pixel_mipmap_t::to_json(json& j) {
+    std::lock_guard<std::mutex> lock(m_mutex);
 
     for (auto& map_entry : m_blocks) {
         j[std::to_string(map_entry.first)] = map_entry.second.get_pixels();
@@ -290,13 +296,13 @@ void audio_pixel_mipmap_t::update() {
     
     m_pool.enqueue([this, sample_buffer](){
         {
-            std::unique_lock<std::shared_mutex> lock(m_mutex);
+            std::lock_guard<std::mutex> lock(m_mutex);
             
             debug("mipmap: updating mipmap in worker thread");
             m_ready = false;
             // pass samples to update audio pixel blocks
             for (auto& it : m_blocks) {
-                std::cout << std::to_string(it.first) << std::endl;
+                debug("updating block {}", it.first);
                 it.second.update(*sample_buffer, num_channels(), sample_rate());
             };
             m_ready = true;

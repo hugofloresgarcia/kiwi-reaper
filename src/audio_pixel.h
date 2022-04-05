@@ -135,11 +135,11 @@ public:
 
     // returns a copy of the block at the specified resolution
     audio_pixel_block_t get_pixels(opt<double> t0, opt<double> t1, 
-                                  double pix_per_s) const;
+                                  double pix_per_s);
 
     // serialization and deserialization
-    bool flush() const; // flush contents to file
-    void to_json(json& j) const ;
+    bool flush(); // flush contents to file
+    void to_json(json& j) ;
     void from_json(const json& j); // TODO: implement me 
 
     // update contents of the mipmap 
@@ -158,11 +158,11 @@ public:
 
 private:
     // finds the lower bound of cached resolutions
-    double get_nearest_pps(double pix_per_s) const;
+    double get_nearest_pps(double pix_per_s);
 
     // create a new interpolated block from a source block
     audio_pixel_block_t create_interpolated_block(double src_pps, double new_pps,
-                                                 opt<double> t0, opt<double> t1) const;
+                                                 opt<double> t0, opt<double> t1);
     
     // to get samples from the MediaItem_track
     safe_audio_accessor_t m_accessor; 
@@ -179,9 +179,9 @@ private:
 
     ThreadPool m_pool {
         std::clamp(
-            std::thread::hardware_concurrency(), 1u, 10u
+            std::thread::hardware_concurrency(), 1u, 3u
         )
     };
-    mutable std::shared_mutex m_mutex;
+    std::mutex m_mutex;
     std::atomic<bool> m_ready {false};
 };

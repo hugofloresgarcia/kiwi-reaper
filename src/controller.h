@@ -77,34 +77,34 @@ public:
         // add a callback to listen to
         m_manager->add_callback("/set_cursor",
         [this](Msg& msg){
-        int index;
-        if (msg.arg().popInt32(index)
-                    .isOkNoMoreArgs()){
-            info("received /set_cursor to {}", index);
-            m_tracks.active().set_cursor(index);
-            send_pixel_update();
-        }
+            int index;
+            if (msg.arg().popInt32(index)
+                        .isOkNoMoreArgs()){
+                info("received /set_cursor to {}", index);
+                m_tracks.active().set_cursor(index);
+                send_pixel_update();
+            }
         });
 
         m_manager->add_callback("/zoom",
         [this](Msg& msg){
-        float amt;
-        if (msg.arg().popFloat(amt)
-                    .isOkNoMoreArgs()){
-            info("received /zoom {} from remote controller", amt);
-            m_tracks.active().zoom((double)amt);
+            float amt;
+            if (msg.arg().popFloat(amt)
+                        .isOkNoMoreArgs()){
+                info("received /zoom {} from remote controller", amt);
+                m_tracks.active().zoom((double)amt);
 
-            send_pixel_update();
-        }
+                send_pixel_update();
+            }
         });
 
         m_manager->add_callback("/init",
         [this](Msg& msg){
-        info("received /init from remote controller");
-        m_tracks.add(GetTrack(project, 0));
-        // set cursor to 0
-        m_tracks.active().set_cursor(0);
-        send_pixel_update();
+            info("received /init from remote controller");
+            m_tracks.add(GetTrack(project, 0));
+            // set cursor to 0
+            m_tracks.active().set_cursor(0);
+            send_pixel_update();
         });
     };
 
