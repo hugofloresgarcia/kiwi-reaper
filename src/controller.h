@@ -132,14 +132,14 @@ public:
             spdlog::info("starting the browsing...");
             // TODO: add some kind of delay when checking this 
             // TODO: this gives the user timeto actually open app
-            DNSServiceRef service_browse_record;
-            int browse_record_status = DNSServiceBrowse(&service_browse_record, 
-                                                        0, 0, "_test._tcp", NULL,
-                                                        controller_browse_replies, 
-                                                        NULL);
+            // DNSServiceRef service_browse_record;
+            // int browse_record_status = DNSServiceBrowse(&service_browse_record, 
+            //                                             0, 0, "_test._tcp", NULL,
+            //                                             controller_browse_replies, 
+            //                                             NULL);
 
-            if (browse_record_status != kDNSServiceErr_NoError) 
-                std::cerr<<"Failed to discover devices. "<<std::endl;
+            // if (browse_record_status != kDNSServiceErr_NoError) 
+            //     std::cerr<<"Failed to discover devices. "<<std::endl;
         }
 
         // TODO: active track do any necessary updates here
