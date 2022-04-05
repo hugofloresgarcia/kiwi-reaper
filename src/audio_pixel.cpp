@@ -21,7 +21,7 @@ double pixel_idx_to_time(int pixel_idx, double pix_per_s) {
 }
 
 int pps_to_samples_per_pix(double pix_per_s, int sample_rate) {
-    return ceil(sample_rate / pix_per_s);
+    return ceil((double)sample_rate / pix_per_s);
 }
 
 double samples_per_pix_to_pps(int samples_per_pix, int sample_rate) {
@@ -61,21 +61,27 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 
     //calcualte the samples per audio pixel and initalize an audio pixel
     int samples_per_pixel = sample_rate / m_pix_per_s;
+    int num_samples_per_channel = sample_buffer.size() / num_channels;
+    int pixels_per_channel = ceil((float)num_samples_per_channel / (float)samples_per_pixel) + 1;
 
     // reallocate if we need to
-    int num_samples_per_channel = sample_buffer.size() / num_channels;
     m_channel_pixels->resize(num_channels);
     for (auto& chan: *m_channel_pixels) {
-        chan.resize(ceil(num_samples_per_channel / samples_per_pixel));
+        chan.resize(pixels_per_channel);
     }
 
-    int pixel_idx = 0;
+    
     for (int channel = 0; channel < num_channels; channel++) {
         debug("processing channel {}", channel);
+        int pixel_idx = 0;
         for (int i = 0; i < num_samples_per_channel; i++) {
             debug("processing sample {} ", i);
             double curr_sample = sample_buffer.at(i*num_channels + channel);
 
+            if (pixel_idx >= (*m_channel_pixels).at(channel).size()) {
+                info("a fatal error occurred. pixel_idx {} is out of bounds", pixel_idx);
+                assert(false);
+            }
             audio_pixel_t& curr_pixel = (*m_channel_pixels).at(channel).at(pixel_idx); 
     
             // update all fields of the current pixeld based on the current sample
@@ -135,7 +141,7 @@ audio_pixel_block_t audio_pixel_block_t::interpolate(double new_pps) const {
     debug("creating interpolated audio pixel block with resolution {}", new_pps);
 
     // TODO: handle optionals here
-    int new_num_pix = ceil(((get_num_pix_per_channel()) / m_pix_per_s) * new_pps);
+    int new_num_pix = ceil(((double)(get_num_pix_per_channel()) / m_pix_per_s) * new_pps);
 
     // our block's time unit (the time between pixels)
     double m_t_unit = 1.0 / m_pix_per_s; 
