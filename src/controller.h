@@ -48,14 +48,16 @@ public:
 
     // cancels any currently sending pixel stream 
     // and sends a new one
-    void send_pixel_update() {
+    void send_pixel_update(bool needs_resend = false) {
         info("sending pixel update to remote");
 
         // check if the active track has changed
         if (!m_sender) {
             make_new_pixel_sender();
         }
-        if (m_tracks.active().get_track_number() !=  m_sender->track().get_track_number()) {
+
+        bool active_track_has_changed = m_tracks.active().get_track_number() !=  m_sender->track().get_track_number();
+        if (active_track_has_changed || needs_resend) {
             // cancel any pixels we're currently sending
             if (m_sender) {
                 info("aborting the current sender");
@@ -82,7 +84,7 @@ public:
                         .isOkNoMoreArgs()){
                 info("received /set_cursor to {}", index);
                 m_tracks.active().set_cursor(index);
-                send_pixel_update();
+                send_pixel_update(false);
             }
         });
 
@@ -94,7 +96,7 @@ public:
                 info("received /zoom {} from remote controller", amt);
                 m_tracks.active().zoom((double)amt);
 
-                send_pixel_update();
+                send_pixel_update(true);
             }
         });
 
@@ -104,7 +106,7 @@ public:
             m_tracks.add(GetTrack(project, 0));
             // set cursor to 0
             m_tracks.active().set_cursor(0);
-            send_pixel_update();
+            send_pixel_update(false);
         });
     };
 
