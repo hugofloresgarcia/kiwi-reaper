@@ -16,7 +16,6 @@
 
 #include "log.h"
 
-
 using json = nlohmann::json;
 
 template<typename T> 
@@ -26,6 +25,8 @@ template<typename T>
 using opt = std::optional<T>; 
 
 using std::shared_ptr;
+
+class audio_pixel_transform_t;
 
 // helpers!
 int time_to_pixel_idx(double time, double pix_per_s);
@@ -121,6 +122,9 @@ public:
     // fill a json object with a block
     void to_json(json& j) const;
 
+    // wrapper to apply transformations from transform object
+    void transform();
+
     // given a buffer with samples, update the block
     // sample buffer must be interleaved
     void update(vec<double>& sample_buffer, int num_channels, int sample_rate);
@@ -133,6 +137,9 @@ private:
 
     // pixels per second
     double m_pix_per_s {1.0};
+    shared_ptr<audio_pixel_transform_t> m_transform {
+        std::make_shared<audio_pixel_transform_t>()
+    };
 };
 
 // hold audio_pixel_block_t at different resolutions
@@ -194,4 +201,39 @@ private:
     };
     std::mutex m_mutex;
     std::atomic<bool> m_ready {false};
+};
+
+class audio_pixel_transform_t {
+public:
+    audio_pixel_transform_t() {};
+    
+    void normalize(std::shared_ptr<vec<vec<audio_pixel_t>>> block){
+        std::vector<double> max_max_field;
+        std::vector<double> min_min_field;
+        std::vector<double> max_rms_field;
+
+        for (vec<audio_pixel_t>& curr_channel : (*block)) {
+            double channel_max_max = std::numeric_limits<double>::lowest();
+            double channel_max_min = std::numeric_limits<double>::max();
+            double channel_max_rms = std::numeric_limits<double>::lowest();
+
+            for (audio_pixel_t& curr_pixel : curr_channel) {
+                channel_max_max = std::max(channel_max_max, curr_pixel.m_max);
+                channel_max_min = std::min(channel_max_min, curr_pixel.m_min);
+                channel_max_rms = std::max(channel_max_max, curr_pixel.m_rms);
+            }
+
+            max_max_field.push_back(channel_max_max);
+            min_min_field.push_back(channel_max_min);
+            max_rms_field.push_back(channel_max_rms);
+        }
+
+        for (int channel_idx = 0; channel_idx < block->size(); channel_idx++) {
+            for (audio_pixel_t& curr_pixel : block->at(channel_idx)) {
+                curr_pixel.m_max = curr_pixel.m_max/max_max_field.at(channel_idx);
+                curr_pixel.m_min = curr_pixel.m_min/min_min_field.at(channel_idx);
+                curr_pixel.m_rms = curr_pixel.m_rms/max_rms_field.at(channel_idx);
+            } 
+        }
+    }
 };

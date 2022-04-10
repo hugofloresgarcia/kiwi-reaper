@@ -182,6 +182,10 @@ int audio_pixel_block_t::get_num_pix_per_channel() const {
     return m_channel_pixels->empty() ? 0 : m_channel_pixels->front().size(); 
 }
 
+void audio_pixel_block_t::transform() {
+    m_transform->normalize(m_channel_pixels);
+}
+
 // ************* audio_pixel_mipmap_t ****************
 
 audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolutions)
@@ -297,6 +301,7 @@ void audio_pixel_mipmap_t::update() {
             for (auto& it : m_blocks) {
                 debug("updating block {}", it.first);
                 it.second.update(*sample_buffer, num_channels(), sample_rate());
+                it.second.transform();
             };
             m_ready = true;
             debug("mipmap: finished updating mipmap in worker thread");

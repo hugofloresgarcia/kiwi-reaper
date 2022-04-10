@@ -13,7 +13,7 @@ public:
     haptic_pixel_t(int idx, audio_pixel_t pixel) : 
         id(idx) 
     {
-        value = abs(pixel.m_max) + abs(pixel.m_min); 
+        value = abs(pixel.m_max) + abs(pixel.m_min) / 2; 
     };
 
     int id { 0 };
