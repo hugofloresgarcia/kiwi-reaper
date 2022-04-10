@@ -72,10 +72,10 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 
     
     for (int channel = 0; channel < num_channels; channel++) {
-        debug("processing channel {}", channel);
+        // debug("processing channel {}", channel);
         int pixel_idx = 0;
         for (int i = 0; i < num_samples_per_channel; i++) {
-            debug("processing sample {} ", i);
+            // debug("processing sample {} ", i);
             double curr_sample = sample_buffer.at(i*num_channels + channel);
 
             if (pixel_idx >= (*m_channel_pixels).at(channel).size()) {
@@ -91,7 +91,7 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 
             int collected_samples = i % samples_per_pixel;
             if ((collected_samples == 0) || i == sample_buffer.size() - 1) {
-                debug("pixel {} collected", pixel_idx);
+                // debug("pixel {} collected", pixel_idx);
                 // complete the RMS calculation, this method accounts 
                 // of edge cases (total sample % samples per pixel != 0)
                 curr_pixel.m_rms = sqrt(curr_pixel.m_rms / 

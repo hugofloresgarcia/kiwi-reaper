@@ -136,6 +136,12 @@ private:
         // document the range of pixels we sent
         std::unique_lock<std::shared_mutex> lock2(m_sent_mutex);
             m_sent_blocks.emplace_back(send_range);
+
+        // wait a bit, then set the cursor
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        oscpkt::Message msg("/cursor");
+        msg.pushInt32(m_track.get_cursor_mip_map_idx());
+        m_manager->send(msg);
     }
 
     range get_send_range(const vec<audio_pixel_t>& pixels) {

@@ -79,6 +79,13 @@ public:
         m_manager->send(msg);
     }
 
+    void send_cursor() {
+        info("sending cursor message to remote");
+
+        oscpkt::Message msg("/cursor");
+        msg.pushInt32(m_tracks.active().get_cursor_mip_map_idx());
+        m_manager->send(msg);
+    }
     
     // use this to register all callbacks with the osc manager
     void add_callbacks() {
@@ -115,7 +122,6 @@ public:
             info("received /init from remote controller");
             m_tracks.add(GetTrack(project, 0));
             // set cursor to 0
-            m_tracks.active().set_cursor(0);
             send_pixel_update(true);
         });
     };
