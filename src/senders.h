@@ -140,11 +140,13 @@ private:
         // wait a bit, then set the cursor
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         oscpkt::Message msg("/cursor");
-        msg.pushInt32(m_track.get_cursor_mip_map_idx());
+        msg.pushStr(json(m_track.get_cursor_mip_map_idx()).dump());
         m_manager->send(msg);
     }
 
     range get_send_range(const vec<audio_pixel_t>& pixels) {
+        debug("calculating send range...");
+
         // find the current cursor position
         int center_idx = m_track.get_cursor_mip_map_idx();
 
@@ -153,6 +155,7 @@ private:
         int end_idx = std::clamp(center_idx + (int)m_block_size / 2 - 1, start_idx, (int)pixels.size());
 
         range trimmed_range = trim_block_if_sent(range(start_idx, end_idx));
+        debug("send range is {} to {}", trimmed_range.first, trimmed_range.second);
         return trimmed_range;
     }
 
@@ -240,15 +243,24 @@ private:
             return;
         }
 
-        // prep the message!
-        oscpkt::Message msg("/pixels");
-        json j = block;
+        for (size_t i = 0; i < block.size(); i += m_chunk_size) {
+            debug("sender, sending chunk {}", i);
+            size_t last = std::min(block.size(), i + m_chunk_size);
+            const vec<haptic_pixel_t>& chunk = get_view(block, i, last);
+            debug("chunk range is {} to {}", i, last);
 
-        msg.pushStr(j.dump());
+            // prep the message!
+            oscpkt::Message msg("/pixels");
+            json j = chunk;
 
-        // send the message
-        m_manager->send(msg);
+            msg.pushStr(j.dump());
 
+            // send the message
+            m_manager->send(msg);
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        }
     };
+
+    int m_chunk_size {64};
 };
 

@@ -42,7 +42,7 @@ public:
         m_sender = std::make_unique<block_pixel_sender_t>(
             m_tracks.active(), // TODO: maybe this should be a shared ptr
             m_manager, 
-            128
+            2048
         );
     }
 
@@ -83,7 +83,7 @@ public:
         info("sending cursor message to remote");
 
         oscpkt::Message msg("/cursor");
-        msg.pushInt32(m_tracks.active().get_cursor_mip_map_idx());
+        msg.pushStr(json(m_tracks.active().get_cursor_mip_map_idx()).dump());
         m_manager->send(msg);
     }
     

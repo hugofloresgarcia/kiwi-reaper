@@ -35,7 +35,17 @@ double samples_per_pix_to_pps(int samples_per_pix, int sample_rate);
 double linear_interp(double x, double x1, double x2, double y1, double y2);
 
 template<typename T>
-const vec<T> get_view(vec<T> const &parent, int start, int end);
+const vec<T> get_view(const vec<T>& parent, int start, int end)
+{
+    end = std::min(end, (int)parent.size()); 
+    start = std::max(start, 0);   
+    // todo: make sure start and  end indices are valid
+    auto startptr = parent.cbegin() + start;
+    auto endptr = parent.cbegin() + end;
+ 
+    vec<T> vec(startptr, endptr);
+    return vec;
+}
 
 // wraps an audio accessor
 class safe_audio_accessor_t {

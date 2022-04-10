@@ -36,19 +36,6 @@ double linear_interp(double x, double x1, double x2, double y1, double y2) {
     return (((x2 - x) / (x2 - x1)) * y1) + ((x - x1) / (x2 - x1)) * y2;
 }
 
-template<typename T>
-const vec<T> get_view(vec<T> const &parent, int start, int end)
-{
-    end = std::min(end, (int)parent.size()); 
-    start = std::max(start, 0);   
-    // todo: make sure start and  end indices are valid
-    auto startptr = parent.cbegin() + start;
-    auto endptr = parent.cbegin() + end;
- 
-    vec<T> vec(startptr, endptr);
-    return vec;
-}
-
 // ************* audio_pixel_block_t ****************
 
 void audio_pixel_block_t::to_json(json& j) const {
