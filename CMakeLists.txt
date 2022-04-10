@@ -51,6 +51,8 @@ add_library(kiwi SHARED
     src/main.cpp
     src/log.h
     src/osc.h
+    src/transform.h
+    src/transform.cpp
 )
   
 target_include_directories(kiwi PRIVATE
