@@ -40,6 +40,14 @@ public:
         // TODO: we should have a pointer to an
         // active track object 
         add_callbacks();
+        int service_reg_status = DNSServiceRegister(&m_kiwi_service_ref, 
+                                                    0, 0, "kiwi-reaper", 
+                                                    "_airplay._tcp", NULL, NULL, 
+                                                    8080, 0, NULL, NULL, NULL);
+
+        // check that bonjour service was registered with no errors
+        if (service_reg_status != kDNSServiceErr_NoError)
+            return 0;
         return success;
     }
 
@@ -150,4 +158,5 @@ private:
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     unique_ptr<block_pixel_sender_t> m_sender;
+    DNSServiceRef m_kiwi_service_ref;
 };

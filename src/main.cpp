@@ -91,16 +91,6 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   // register action hooks
   if (!rec->Register("csurf_inst", (void *)controller))
     return 0;
-
-  DNSServiceRef kiwi_service_ref;
-  int service_reg_status = DNSServiceRegister(&kiwi_service_ref, 
-                                              0, 0, "kiwi-reaper", 
-                                              "_test._tcp", NULL, NULL, 
-                                              8080, 0, NULL, NULL, NULL);
-
-  // check that bonjour service was registered with no errors
-  if (service_reg_status != kDNSServiceErr_NoError)
-    return 0;
   
   // initialization code here
 
