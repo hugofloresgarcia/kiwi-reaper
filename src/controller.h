@@ -71,6 +71,14 @@ public:
         m_sender->send();
         debug("pixel sender sent!");
     }
+
+    void send_clear() {
+        info("sending clear message to remote");
+
+        oscpkt::Message msg("/pixels/clear");
+        m_manager->send(msg);
+    }
+
     
     // use this to register all callbacks with the osc manager
     void add_callbacks() {
@@ -96,6 +104,8 @@ public:
                 info("received /zoom {} from remote controller", amt);
                 m_tracks.active().zoom((double)amt);
 
+                // clear first, then update pixels
+                send_clear();
                 send_pixel_update(true);
             }
         });
@@ -106,7 +116,7 @@ public:
             m_tracks.add(GetTrack(project, 0));
             // set cursor to 0
             m_tracks.active().set_cursor(0);
-            send_pixel_update(false);
+            send_pixel_update(true);
         });
     };
 
