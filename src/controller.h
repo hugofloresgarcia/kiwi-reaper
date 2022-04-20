@@ -5,6 +5,7 @@
 #include "senders.h"
 #include "osc.h"
 #include "log.h"
+#include "include/zeroconf/source/zeroconf/zeroconf.service.h"
 
 #define project nullptr
 
@@ -21,6 +22,21 @@ void controller_browse_replies(
                             void                                *context){
     spdlog::info(service_name);
     return;
+}
+
+void bonjour_message_callback(
+    DNSServiceRef                       sdRef,
+    DNSServiceFlags                     flags,
+    DNSServiceErrorType                 errorCode,
+    const char                          *name,
+    const char                          *regtype,
+    const char                          *domain,
+    void                                *context) {
+        info("a bonjour message call back called.");
+        info("name: {}", name);
+        info("regtype: {}", regtype);
+        info("domain: {}", domain);
+        info("error code: {}", errorCode);
 }
 
 class osc_controller_t : IReaperControlSurface {
@@ -40,14 +56,13 @@ public:
         // TODO: we should have a pointer to an
         // active track object 
         add_callbacks();
-        int service_reg_status = DNSServiceRegister(&m_kiwi_service_ref, 
-                                                    0, 0, "kiwi-reaper", 
-                                                    "_airplay._tcp", NULL, NULL, 
-                                                    8080, 0, NULL, NULL, NULL);
+
+        m_service = std::make_unique<zeroconf_service>("", "_osc._udp", "kiwi-reaper-pc", RECV_PORT);
 
         // check that bonjour service was registered with no errors
-        if (service_reg_status != kDNSServiceErr_NoError)
-            return 0;
+        // if (service_reg_status != kDNSServiceErr_NoError)
+        //     return 0;
+
         return success;
     }
 
@@ -131,26 +146,7 @@ public:
 
     // this runs about 30x per second. do all OSC polling here
     virtual void Run() override {
-        if (m_connection_status) {
-            // handle any packets
-            m_manager->handle_receive(false);
-        }
-
-        else {
-            spdlog::info("starting the browsing...");
-            // TODO: add some kind of delay when checking this 
-            // TODO: this gives the user timeto actually open app
-            // DNSServiceRef service_browse_record;
-            // int browse_record_status = DNSServiceBrowse(&service_browse_record, 
-            //                                             0, 0, "_test._tcp", NULL,
-            //                                             controller_browse_replies, 
-            //                                             NULL);
-
-            // if (browse_record_status != kDNSServiceErr_NoError) 
-            //     std::cerr<<"Failed to discover devices. "<<std::endl;
-        }
-
-        // TODO: active track do any necessary updates here
+        m_manager->handle_receive(false);
     }
 
 private:
@@ -159,4 +155,5 @@ private:
     haptic_track_map_t m_tracks;
     unique_ptr<block_pixel_sender_t> m_sender;
     DNSServiceRef m_kiwi_service_ref;
+    std::unique_ptr<zeroconf_service> m_service {nullptr};
 };

@@ -22,6 +22,9 @@ public:
   bool init() {
     m_init = m_send_sock.connectTo(m_addr, m_send_port) \
               && m_recv_sock.bindTo(m_recv_port);
+
+    info("receive sock is bound with hostname and port: {}", m_recv_sock.localHostNameWithPort());
+    info("receive sock has addresses: {} and {}", m_recv_sock.local_addr.asString(), m_recv_sock.remote_addr.asString());
     return m_init;
   }
 
@@ -35,7 +38,7 @@ public:
 
       // pop as many messages as are in the packet
       while (reader.isOk() && (msg = reader.popMessage()) != 0) {
-        debug("osc message received: {}", msg->addressPattern());
+        info("osc message received: {}", msg->addressPattern());
         for (const auto &pair : m_callbacks){
           // only call if pattern matches
           if (msg->match(pair.first).isOk())

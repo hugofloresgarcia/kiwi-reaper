@@ -10,18 +10,19 @@
 #define BAIL_IF_NO_REG(x) if (!x) { std::cerr<<"failed to register function "<<x<<std::endl; return 0; }
 #define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x) ; BAIL_IF_NO_REG(x) ;
 
-#include "include/bonjour/dns_sd.h"
+#include "dns_sd.h"
 
 #include "reaper_plugin_functions.h"
 #include <cstdio>
 #include <string>
 #include <utility>
 
+static std::string ADDRESS = "192.168.0.198";
+#define SEND_PORT  8000
+#define RECV_PORT  8080
+
 #include "controller.h"
 
-static std::string ADDRESS = "192.168.0.198";
-static int SEND_PORT = 8000;
-static int RECV_PORT = 8001;
 
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
@@ -96,5 +97,3 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
 
   return 1;
 }
-
-

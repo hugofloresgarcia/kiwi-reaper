@@ -43,6 +43,18 @@ add_library(kiwi SHARED
     include/oscpkt/oscpkt.hh
     include/oscpkt/udp.hh
     include/json/json.hpp
+    include/zeroconf/source/zeroconf/common/CriticalSection.cpp
+    include/zeroconf/source/zeroconf/common/CriticalSection.h
+    include/zeroconf/source/zeroconf/common/NetService.cpp
+    include/zeroconf/source/zeroconf/common/NetService.h
+    include/zeroconf/source/zeroconf/common/NetServiceBrowser.cpp
+    include/zeroconf/source/zeroconf/common/NetServiceBrowser.h
+    include/zeroconf/source/zeroconf/common/NetServiceThread.cpp
+    include/zeroconf/source/zeroconf/common/NetServiceThread.h
+    include/zeroconf/source/zeroconf/common/Thread.cpp
+    include/zeroconf/source/zeroconf/common/Thread.h
+    include/zeroconf/source/zeroconf/common/VERSION.h
+    include/zeroconf/source/zeroconf/zeroconf.service.h
     src/audio_pixel.h
     src/audio_pixel.cpp
     src/controller.h
