@@ -42,7 +42,7 @@ public:
         m_sender = std::make_unique<block_pixel_sender_t>(
             m_tracks.active(), // TODO: maybe this should be a shared ptr
             m_manager, 
-            2048
+            2048 * 16
         );
     }
 

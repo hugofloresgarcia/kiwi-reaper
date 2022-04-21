@@ -2,6 +2,7 @@
 
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/details/os.h"
 
 #include <iostream>
 
@@ -16,6 +17,7 @@ using spdlog::warn;
 inline void kiwi_logger_init(const std::string& path) {
     try 
     {
+        spdlog::details::os::remove_if_exists(path);
         auto logger = spdlog::basic_logger_mt("log", path);
         logger->set_level(LOG_LEVEL);
         spdlog::set_default_logger(logger);
