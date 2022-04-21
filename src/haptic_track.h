@@ -68,7 +68,6 @@ public:
   static void set_cursor(int mip_map_idx) {
     double t = mip_map_idx / GetHZoomLevel();
     debug("setting cursor to mipmap index {}, at time {}", mip_map_idx, t);
-    SetEditCurPos(0, true, true);
     SetEditCurPos(t, true, true);
   }
 
