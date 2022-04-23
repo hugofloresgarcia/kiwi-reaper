@@ -60,14 +60,14 @@ public:
 
   static void set_cursor(int mip_map_idx) {
     double t = mip_map_idx / GetHZoomLevel();
-    debug("setting cursor to mipmap index {}, at time {}", mip_map_idx, t);
+    // debug("setting cursor to mipmap index {}, at time {}", mip_map_idx, t);
     SetEditCurPos(t, true, true);
   }
 
   static int get_cursor_mip_map_idx() {
     double t = GetCursorPosition();
     int mip_map_idx = floor(t * GetHZoomLevel());
-    debug("getting cursor position, returning mipmap index {}", mip_map_idx);
+    // debug("getting cursor position, returning mipmap index {}", mip_map_idx);
     return mip_map_idx;
   }
 

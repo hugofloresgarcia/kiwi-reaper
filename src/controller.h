@@ -36,15 +36,18 @@ public:
         // add the track to our map if we gotta
         m_tracks.add(trackid);
         m_tracks.active(trackid);
+        send_pixel_update(false);
     };
 
     void make_new_pixel_sender() {
         debug("creating new pixel sender");
-        m_senders.push(std::make_unique<block_pixel_sender_t>(
-            *m_tracks.active(), // TODO: maybe this should be a shared ptr
-            m_manager, 
-            2048 * 8
-        ));
+        if (m_tracks.active()) {
+            m_senders.push(std::make_unique<block_pixel_sender_t>(
+                *m_tracks.active(), // TODO: maybe this should be a shared ptr
+                m_manager, 
+                2048 * 8
+            ));
+        }
     }
 
     // cancels any currently sending pixel stream 
@@ -52,10 +55,6 @@ public:
     void send_pixel_update(bool needs_resend = false) {
         info("sending pixel update to remote");
         info("senders size: {}", m_senders.size());
-
-        if (needs_resend){
-            info("whoops");
-        }
 
         // check if the active track has changed
         bool active_track_has_changed = m_senders.size() ? m_tracks.active()->get_track_number() != 
