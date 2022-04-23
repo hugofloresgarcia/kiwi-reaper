@@ -5,6 +5,7 @@
 
 #include "reaper_plugin_functions.h"
 
+#define project nullptr
 using std::unordered_map;
 
 // TODO: we're gonna need to figure out how to find out 
@@ -36,20 +37,12 @@ public:
     m_active_channel = 0;
   }
 
-  // TODO:should probably update mipmaps
-  void update() {}; 
+  bool update() { return m_mipmap->update();} 
  
   void next_channel() { m_active_channel = (m_active_channel + 1) % m_mipmap->num_channels(); }
   void prev_channel() { m_active_channel = (m_active_channel - 1) % m_mipmap->num_channels(); } 
   int get_active_channel() {  return m_active_channel; }
 
-  // moves the selected region by an amt
-  // TODO: implement me
-  void move();
-
-  // slices at current cursor position
-  // TODO: implement me
-  void slice();
 
   // returns the pixels at the current resolution
   // note: only returns a small frame of pixels, (size get_pixel_frame_width())
@@ -111,11 +104,21 @@ private:
 // a map to hold one haptic track per MediaTrack
 class haptic_track_map_t {
 public:
-  haptic_track_t& active() { 
+
+  haptic_track_map_t() {
+    // start with the master track
+    MediaTrack* master_track = GetMasterTrack(project);
+  }
+
+  shared_ptr<haptic_track_t> active() { 
     // TODO: check that the track we're returning actually 
     // still exists
     // debug("returning active haptic track with index: {}", active_track);
-    return tracks[active_track]; 
+    if (tracks.size() == 0) {
+      return nullptr;
+    } else {
+      return tracks.at(active_track); 
+    }
   };
 
   void add(MediaTrack* track) {
@@ -127,7 +130,7 @@ public:
     // only add if it's new
     if (tracks.find(tracknum) == tracks.end()) {
       debug("track is new. adding!");
-      tracks[tracknum] = haptic_track_t(track);
+      tracks[tracknum] = std::make_shared<haptic_track_t>(track);
 
       active_track = tracknum;
     } else {
@@ -135,6 +138,16 @@ public:
     }
   }
 
-  unordered_map<int, haptic_track_t> tracks;
+  void active(MediaTrack* track) {
+    int tracknum = haptic_track_t::get_track_number(track);
+    if (!(tracks.find(tracknum) == tracks.end())) {
+      active_track = tracknum;
+    } else {
+      debug("track not found in track map");
+    }
+  }
+
+private:
+  unordered_map<int, shared_ptr<haptic_track_t>> tracks;
   int active_track {-1}; // master
 };

@@ -51,14 +51,34 @@ const vec<T> get_view(const vec<T>& parent, int start, int end)
 // wraps an audio accessor
 class safe_audio_accessor_t {
 public:
-    safe_audio_accessor_t(MediaTrack* track) : m_accessor(CreateTrackAudioAccessor(track)){};
-    ~safe_audio_accessor_t() { if(m_accessor) { DestroyAudioAccessor(m_accessor); } };
+    safe_audio_accessor_t(MediaTrack* track) 
+      : m_accessor(CreateTrackAudioAccessor(track)), m_track(track) {
+          
+        // state_changed();
+     };
+
+    ~safe_audio_accessor_t() { 
+        if(m_accessor) { DestroyAudioAccessor(m_accessor); } 
+    };
+
+    void reset() {
+        if(m_accessor) { DestroyAudioAccessor(m_accessor); }
+        m_accessor = CreateTrackAudioAccessor(m_track);
+    }
+
+    bool state_changed() {
+        bool changed = AudioAccessorStateChanged(m_accessor);
+        return changed;
+    }
 
     AudioAccessor* get() { return m_accessor; };
-    bool is_valid() { return m_accessor; };
+    bool is_valid() { 
+        return m_accessor; 
+    };
     
 private:
     AudioAccessor* m_accessor {nullptr};
+    MediaTrack* m_track {nullptr};
 };
 
 // one sample of audio pixel data, which stores max, min, and rms values
@@ -161,7 +181,8 @@ public:
 
     // update contents of the mipmap 
     // (if the audio accessor state has changed)
-    void update();
+    bool update();
+    void fill_map(); // fill map contents
     bool ready() { return m_ready; };
 
     int num_channels() const { 

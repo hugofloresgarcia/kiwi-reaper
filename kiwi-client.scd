@@ -32,7 +32,7 @@ Routine({
 (
 Routine({
 	1.do({
-		b.sendMsg("/zoom", -1);
+		b.sendMsg("/flush_map", -1);
 		1.wait;
 	});
 }).play;

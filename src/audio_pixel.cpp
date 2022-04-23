@@ -59,6 +59,9 @@ void audio_pixel_block_t::update(vec<double>& sample_buffer, int num_channels,
 
     
     for (int channel = 0; channel < num_channels; channel++) {
+        std::fill(m_channel_pixels->at(channel).begin(), 
+                  m_channel_pixels->at(channel).end(), 
+                  audio_pixel_t());     
         // debug("processing channel {}", channel);
         int pixel_idx = 0;
         for (int i = 0; i < num_samples_per_channel; i++) {
@@ -194,16 +197,12 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
     info("creating audio pixel mipmap for track {:x}", 
           (void*)m_track);
 
-    if (!m_accessor.is_valid()) {
-        info("got invalid audio accessor for track {:x}", (void*)m_track);
-        return; 
-    }
     for (double res : resolutions) {
         m_blocks[res] = audio_pixel_block_t(res);
     }
     m_block_pps = resolutions;
     std::sort(m_block_pps.begin(), m_block_pps.end());
-    update();
+    fill_map();
 }
 
 audio_pixel_block_t audio_pixel_mipmap_t::get_pixels(opt<double> t0, opt<double> t1, double pix_per_s) {
@@ -232,7 +231,6 @@ double audio_pixel_mipmap_t::get_nearest_pps(double pix_per_s) {
 
 // thread safe
 bool audio_pixel_mipmap_t::flush(){
-    std::lock_guard<std::mutex> lock(m_mutex);
 
     json j;
     to_json(j);
@@ -258,20 +256,23 @@ void audio_pixel_mipmap_t::to_json(json& j) {
     }
 }
 
-// update all blocks
-// MUST BE CALLED BY MAIN THREAD
-// due to reaper api calls: AudioAccessorUpdate
-void audio_pixel_mipmap_t::update() {
-    debug("mipmap: updating mipmap");
+void audio_pixel_mipmap_t::fill_map() {
+    debug("starting mipmap fill");
+    // m_accessor = safe_audio_accessor_t(m_track);
 
-    // TODO: we do need to check the last updated time somehow
-    AudioAccessor* safe_accessor = m_accessor.get();
+    if (!m_accessor.is_valid()) {
+        info("got invalid audio accessor for track {:x}", (void*)m_track);
+        return; 
+    }
+    // m_accessor.get();
 
-    double accessor_start_time = GetAudioAccessorStartTime(safe_accessor);
-    double accessor_end_time = GetAudioAccessorEndTime(safe_accessor);
-    debug("mipmap: accessor start time {} end time {}", accessor_start_time, accessor_end_time);
-
-    // get sample rate
+    double accessor_start_time = GetAudioAccessorStartTime(m_accessor.get());
+    double accessor_end_time = GetAudioAccessorEndTime(m_accessor.get());
+    debug("mipmap: accessor start time: {}; end time: {};", accessor_start_time, accessor_end_time);
+    if (accessor_end_time <= accessor_start_time) {
+        info("mipmap: accessor end time is less than or equal to start time");
+        return;
+    }
     
     // calculate the number of samples we want to collect per channel
     int samples_per_channel = sample_rate() * (accessor_end_time - accessor_start_time);
@@ -280,7 +281,7 @@ void audio_pixel_mipmap_t::update() {
 
     // TODO: can we do this from a worker thread? 
     // if not, is it too slow and will we have a problem? 
-    int sample_status = GetAudioAccessorSamples(safe_accessor, sample_rate(), num_channels(), 
+    int sample_status = GetAudioAccessorSamples(m_accessor.get(), sample_rate(), num_channels(), 
                                                 accessor_start_time, samples_per_channel, 
                                                 sample_buffer->data());
 
@@ -288,7 +289,7 @@ void audio_pixel_mipmap_t::update() {
     // samples stored in sample_buffer, operation status is returned
     if (!sample_status) {
         debug("mipmap: failed to get samples from accessor");
-        return; // TODO: LOG ME
+        return;
     } 
     
     m_pool.enqueue([this, sample_buffer](){
@@ -305,7 +306,27 @@ void audio_pixel_mipmap_t::update() {
             };
             m_ready = true;
             debug("mipmap: finished updating mipmap in worker thread");
+            // DestroyAudioAccessor(m_accessor.get());
         }
     });
+}
+
+// update all blocks
+// MUST BE CALLED BY MAIN THREAD
+// due to reaper api calls: AudioAccessorUpdate
+bool audio_pixel_mipmap_t::update() {
+    // debug("mipmap: updating mipmap");
+
+    if (m_accessor.state_changed()) {
+        info("mipmap: accessor state changed");
+        AudioAccessorValidateState(m_accessor.get());
+        AudioAccessorUpdate(m_accessor.get());
+
+        int ret = AudioAccessorValidateState(m_accessor.get());
+        fill_map();
+        return true;
+    } else {
+        return false;
+    }
 };
 

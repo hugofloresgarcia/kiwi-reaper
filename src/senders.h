@@ -76,6 +76,7 @@ protected:
 
     // abort flag
     std::atomic<bool> m_abort {false};
+    bool m_done {false};
 
     // the size of the block to send
     size_t m_block_size;
@@ -102,6 +103,7 @@ private:
         // check again, but this time return if they're empty
         if (m_block.get_pixels().empty()) {
             debug("no pixels to send");
+            m_done = true;
             return;
         }
 
@@ -114,6 +116,7 @@ private:
 
         if ((send_range.second - send_range.first) == 0) {
             debug("no pixels to send");
+            m_done = true;
             return;
         }
 
@@ -138,10 +141,11 @@ private:
             m_sent_blocks.emplace_back(send_range);
 
         // wait a bit, then set the cursor
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         oscpkt::Message msg("/cursor");
         msg.pushStr(json(m_track.get_cursor_mip_map_idx()).dump());
         m_manager->send(msg);
+        m_done = true;
     }
 
     range get_send_range(const vec<audio_pixel_t>& pixels) {

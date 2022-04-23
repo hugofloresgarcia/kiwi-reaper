@@ -71,6 +71,9 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(SetMediaItemTakeInfo_Value, rec);
   REG_FUNC(SetMediaItemInfo_Value, rec);
   REG_FUNC(GetTrack, rec);
+  REG_FUNC(GetMasterTrack, rec);
+  REG_FUNC(GetAudioAccessorHash, rec);
+  REG_FUNC(AudioAccessorValidateState, rec);
 
   REG_FUNC(ValidatePtr2, rec);
 
