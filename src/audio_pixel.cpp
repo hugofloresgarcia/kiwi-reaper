@@ -280,19 +280,19 @@ void audio_pixel_mipmap_t::fill_map() {
         std::make_shared<vec<double>>(samples_per_channel*num_channels());
 
     // TODO: can we do this from a worker thread? 
-    // if not, is it too slow and will we have a problem? 
+    // if not, is it too slow and will we have a problem?
     int sample_status = GetAudioAccessorSamples(m_accessor.get(), sample_rate(), num_channels(), 
                                                 accessor_start_time, samples_per_channel, 
                                                 sample_buffer->data());
 
 
     // samples stored in sample_buffer, operation status is returned
-    if (!sample_status) {
-        debug("mipmap: failed to get samples from accessor");
+    if (sample_status < 1) {
+        debug("mipmap: failed to get samples from accessor: error: {}", sample_status);
         return;
     } 
     
-    m_pool.enqueue([this, sample_buffer](){
+    m_pool->enqueue([this, sample_buffer](){
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             
@@ -303,6 +303,11 @@ void audio_pixel_mipmap_t::fill_map() {
                 debug("updating block {}", it.first);
                 it.second.update(*sample_buffer, num_channels(), sample_rate());
                 it.second.transform();
+
+                if (m_abort) {
+                    debug("mipmap: aborting mipmap fill");
+                    return;
+                }
             };
             m_ready = true;
             debug("mipmap: finished updating mipmap in worker thread");
@@ -323,6 +328,12 @@ bool audio_pixel_mipmap_t::update() {
         AudioAccessorUpdate(m_accessor.get());
 
         int ret = AudioAccessorValidateState(m_accessor.get());
+
+        m_abort = true;
+        m_pool = std::make_unique<ThreadPool>(std::clamp(
+            std::thread::hardware_concurrency(), 2u, 16u
+        ));
+
         fill_map();
         return true;
     } else {

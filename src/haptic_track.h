@@ -96,7 +96,7 @@ private:
   MediaItem* m_item {nullptr};
   MediaItem_Take* m_take {nullptr};
 
-  int m_active_channel {0};
+  int m_active_channel {0};  
 
   std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
 };

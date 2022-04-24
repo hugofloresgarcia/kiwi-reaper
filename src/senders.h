@@ -37,14 +37,14 @@ public:
         : m_track(track), m_manager(manager), m_block_size(block_size) {}
 
     // send, optionally blocking until the block is sent
-    void send(bool block = false) {
+    void send(bool send_cursor = false, bool block = false) {
         if (!block) {
             debug("initing worker thread for pixel send");
-            m_work_pool.enqueue([this]() {
-                prepare_and_send();
+            m_work_pool.enqueue([this, send_cursor]() {
+                prepare_and_send(send_cursor);
             });
         } else {
-            prepare_and_send();
+            prepare_and_send(send_cursor);
         }
     }
 
@@ -83,7 +83,7 @@ protected:
 
 private:
     // prepares a haptic pixel block for sending
-    void prepare_and_send() {
+    void prepare_and_send(bool send_cursor) {
         debug("inside worker thread, sending pixels");
 
         // if our block is initially empty
@@ -140,11 +140,13 @@ private:
         std::unique_lock<std::shared_mutex> lock2(m_sent_mutex);
             m_sent_blocks.emplace_back(send_range);
 
-        // wait a bit, then set the cursor
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        oscpkt::Message msg("/cursor");
-        msg.pushStr(json(m_track.get_cursor_mip_map_idx()).dump());
-        m_manager->send(msg);
+        // // wait a bit, then set the cursor
+        if (send_cursor) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            oscpkt::Message msg("/cursor");
+            msg.pushStr(json(m_track.get_cursor_mip_map_idx()).dump());
+            m_manager->send(msg);
+        }
         m_done = true;
     }
 

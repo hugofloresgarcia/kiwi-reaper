@@ -58,11 +58,15 @@ public:
      };
 
     ~safe_audio_accessor_t() { 
-        if(m_accessor) { DestroyAudioAccessor(m_accessor); } 
+        if(m_accessor) { 
+            // https://github.com/reaper-oss/sws/blob/bcc8fbc96f30a943bd04fb8030b4a03ea1ff7557/Breeder/BR_Loudness.cpp#L246
+            if (EnumProjects(0, NULL, 0))
+                DestroyAudioAccessor(m_accessor); 
+        } 
     };
 
     void reset() {
-        if(m_accessor) { DestroyAudioAccessor(m_accessor); }
+        if (m_accessor) { DestroyAudioAccessor(m_accessor); }
         m_accessor = CreateTrackAudioAccessor(m_track);
     }
 
@@ -215,13 +219,16 @@ private:
     // our parent media track
     MediaTrack* m_track {nullptr};
 
-    ThreadPool m_pool {
-        std::clamp(
-            std::thread::hardware_concurrency(), 1u, 3u
+    std::unique_ptr<ThreadPool> m_pool {
+        std::make_unique<ThreadPool>(
+            std::clamp(
+                std::thread::hardware_concurrency(), 2u, 16u
+            )
         )
     };
     std::mutex m_mutex;
     std::atomic<bool> m_ready {false};
+    std::atomic<bool> m_abort {false};
 };
 
 class audio_pixel_transform_t {

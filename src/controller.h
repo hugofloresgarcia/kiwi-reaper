@@ -52,7 +52,7 @@ public:
 
     // cancels any currently sending pixel stream 
     // and sends a new one
-    void send_pixel_update(bool needs_resend = false) {
+    void send_pixel_update(bool sync = false, bool needs_resend = false) {
         info("sending pixel update to remote");
         info("senders size: {}", m_senders.size());
 
@@ -105,8 +105,7 @@ public:
                 shared_ptr<haptic_track_t> active_track = m_tracks.active();
                 if (active_track)
                     active_track->set_cursor(index);
-                send_pixel_update(false);
-                this->m_last_cursor_pos = index;
+                send_pixel_update(false, false);
             }
         });
 
@@ -121,8 +120,7 @@ public:
                     active_track->zoom((double)amt);
 
                 // clear first, then update pixels
-                send_pixel_update(true);
-                this->m_last_zoom = GetHZoomLevel();
+                send_pixel_update(false, true);
             }
         });
 
@@ -131,7 +129,7 @@ public:
             info("received /init from remote controller");
             m_tracks.add(GetTrack(project, 0));
             // set cursor to 0
-            send_pixel_update(true);
+            send_pixel_update(true, true);
         });
 
         m_manager->add_callback("/flush_map", 
@@ -143,36 +141,24 @@ public:
                 active_track->mipmap().flush();
 
         });
-    };
+
+        m_manager->add_callback("/sync",
+        [this](Msg& msg){
+            info("received /sync from remote controller");
+            shared_ptr<haptic_track_t> active_track = m_tracks.active();
+            if (active_track) {
+                send_pixel_update(true, true);
+            }
+        });
+    }
 
     // this runs about 30x per second. do all OSC polling here
     virtual void Run() override {
         // handle any packets
         m_manager->handle_receive(false);
-
-        shared_ptr<haptic_track_t> active_track = m_tracks.active();
-        if (active_track) {
-            int cursor_pos = active_track->get_cursor_mip_map_idx();
-            if (cursor_pos != m_last_cursor_pos) {
-                m_last_cursor_pos = cursor_pos;
-                // send_cursor();
-            }
-
-            if (m_last_zoom != GetHZoomLevel()) {
-                m_last_zoom = GetHZoomLevel();
-                send_pixel_update(true);
-            }
-
-            if (active_track->update())
-                send_pixel_update(true);
-        }
-        
     }
 
 private:
-    int m_last_cursor_pos {0};
-    double m_last_zoom {0};
-
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     std::queue<unique_ptr<block_pixel_sender_t>> m_senders;
