@@ -32,7 +32,7 @@ public:
 
     virtual ~osc_controller_t() {}
 
-    void OnTrackSelection(MediaTrack *trackid) override {
+   void OnTrackSelection(MediaTrack *trackid) override {
         // add the track to our map if we gotta
         m_tracks.add(trackid);
         m_tracks.active(trackid);

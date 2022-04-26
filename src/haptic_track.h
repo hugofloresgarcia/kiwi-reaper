@@ -29,7 +29,9 @@ public:
     std::vector<int> resolutions = {256, 1024, 4096, 16384, 65536, 262144};
     std::vector<double> pix_per_s_res;
     for (int res : resolutions) {
-      pix_per_s_res.push_back(samples_per_pix_to_pps(res, audio_pixel_mipmap_t::sample_rate()));
+      double pps_res = samples_per_pix_to_pps(res, audio_pixel_mipmap_t::sample_rate());
+      if (pps_res > 1)
+        pix_per_s_res.push_back(pps_res);
     }
 
     m_mipmap = std::make_unique<audio_pixel_mipmap_t>(m_track, pix_per_s_res);

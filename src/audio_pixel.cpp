@@ -198,7 +198,8 @@ audio_pixel_mipmap_t::audio_pixel_mipmap_t(MediaTrack* track, vec<double> resolu
           (void*)m_track);
 
     for (double res : resolutions) {
-        m_blocks[res] = audio_pixel_block_t(res);
+        if (res > 0)
+            m_blocks[res] = audio_pixel_block_t(res);
     }
     m_block_pps = resolutions;
     std::sort(m_block_pps.begin(), m_block_pps.end());
