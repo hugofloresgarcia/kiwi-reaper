@@ -17,7 +17,7 @@
 
 #include "controller.h"
 
-static std::string ADDRESS = "192.168.0.198";
+static std::string ADDRESS = "10.105.159.127";
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
@@ -40,6 +40,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(CreateTrackAudioAccessor, rec);
   REG_FUNC(CSurf_OnZoom, rec);
   REG_FUNC(DestroyAudioAccessor, rec);
+  REG_FUNC(EnumProjects, rec);
   REG_FUNC(GetAudioAccessorEndTime, rec);
   REG_FUNC(GetAudioAccessorStartTime, rec);
   REG_FUNC(GetAudioAccessorSamples, rec);

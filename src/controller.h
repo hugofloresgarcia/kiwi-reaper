@@ -1,7 +1,7 @@
 #pragma once
 
-#include "audio_pixel.h"
 #include "haptic_track.h"
+#include "mipmap.h"
 #include "osc.h"
 #include "log.h"
 
@@ -86,6 +86,53 @@ public:
             }
         });
 
+        // send a block of pixels, given a range of indices
+        m_manager->add_callback("/pixels",
+        [this](Msg& msg){
+            std::string json_str;
+            if (msg.arg().popStr(json_str)
+                        .isOkNoMoreArgs()){
+                info("range received: {}", json_str);
+                auto range = json::parse(json_str);
+                int start = range.at(0).get<int>();
+                int end = range.at(1).get<int>();
+                
+                if ((end - start) < 1) {
+                    info("range is empty");
+                    return;
+                }
+
+                shared_ptr<haptic_track_t> active_track = m_tracks.active();
+
+                if (active_track) {
+                    m_pool.enqueue([this, active_track, start, end]() {
+                        info("inside worker thread, getting pixels from {} to {}", start, end);
+                        audio_pixel_block_t& audiopix_block = active_track->get_pixels();
+
+                        auto haptic_block = from(audiopix_block.get_pixels()
+                                                    .at(active_track->get_active_channel()), 
+                                                        start, end);
+
+                        size_t chunk_size = 128;
+                        for (size_t i = 0; i < haptic_block.size(); i+= chunk_size) {
+                            size_t last = std::min(i + chunk_size, haptic_block.size());
+
+                            const haptic_pixel_block_t& chunk = get_view(haptic_block, i, last);
+
+                            oscpkt::Message msg("/pixels");
+                            json j = chunk;
+                            msg.pushStr(j.dump());
+                            m_manager->send(msg);
+
+                            std::this_thread::sleep_for(std::chrono::microseconds(1));
+                        }
+
+                        debug("pixel block sent");
+                    });
+                }
+            }
+        });
+
         m_manager->add_callback("/zoom",
         [this](Msg& msg){
             float amt;
@@ -104,7 +151,7 @@ public:
             shared_ptr<haptic_track_t> active_track = m_tracks.active();
             json j;
             if (active_track)
-                active_track->mipmap().flush();
+                active_track->mipmap()->flush();
 
         });
 

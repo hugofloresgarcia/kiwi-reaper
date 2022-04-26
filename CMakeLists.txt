@@ -43,11 +43,13 @@ add_library(kiwi SHARED
     include/oscpkt/oscpkt.hh
     include/oscpkt/udp.hh
     include/json/json.hpp
-    src/audio_pixel.h
-    src/audio_pixel.cpp
+    src/accessor.h
+    src/pixel.h
+    src/pixel_block.h
+    src/pixel_helpers.h
+    src/mipmap.h
     src/controller.h
     src/haptic_track.h
-    src/senders.h
     src/main.cpp
     src/log.h
     src/osc.h
