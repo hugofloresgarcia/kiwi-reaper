@@ -1,1 +1,1 @@
-watch -n 0.1 tail -50 "/Users/hugo/Library/Application\ Support/REAPER/kiwi-log.txt"
+watch -n 0.1 tail -15 "/Users/hugo/Library/Application\ Support/REAPER/kiwi-log.txt"

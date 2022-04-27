@@ -47,8 +47,6 @@ public:
 
 
   // returns the pixels at the current resolution
-  // note: only returns a small frame of pixels, (size get_pixel_frame_width())
-  // centered around the current cursor position
   audio_pixel_block_t get_pixels() {
     debug("getting pixels for track {:x}", (void*)m_track);
     if (!m_mipmap) {
@@ -58,6 +56,16 @@ public:
     double pix_per_s = GetHZoomLevel();
 
     return m_mipmap->get_pixels(std::nullopt, std::nullopt, pix_per_s);
+  }
+
+  audio_pixel_t get_pixel(int mip_map_index) {
+    double pix_per_s = GetHZoomLevel();
+
+    if (pix_per_s != m_active_block.get_pps()) {
+      m_active_block = this->get_pixels();
+    }
+
+    return m_active_block.get_pixels().at(m_active_channel).at(mip_map_index);
   }
 
   static void set_cursor(int mip_map_idx) {
@@ -99,6 +107,8 @@ private:
   MediaItem_Take* m_take {nullptr};
 
   int m_active_channel {0};  
+
+  audio_pixel_block_t m_active_block;
 
   std::unique_ptr<audio_pixel_mipmap_t> m_mipmap {nullptr};
 };

@@ -2,7 +2,6 @@
 
 #include "audio_pixel.h"
 #include "haptic_track.h"
-#include "senders.h"
 #include "osc.h"
 #include "log.h"
 
@@ -36,52 +35,7 @@ public:
         // add the track to our map if we gotta
         m_tracks.add(trackid);
         m_tracks.active(trackid);
-        send_pixel_update(false);
     };
-
-    void make_new_pixel_sender() {
-        debug("creating new pixel sender");
-        if (m_tracks.active()) {
-            m_senders.push(std::make_unique<block_pixel_sender_t>(
-                *m_tracks.active(), // TODO: maybe this should be a shared ptr
-                m_manager, 
-                2048 * 8
-            ));
-        }
-    }
-
-    // cancels any currently sending pixel stream 
-    // and sends a new one
-    void send_pixel_update(bool sync = false, bool needs_resend = false) {
-        info("sending pixel update to remote");
-        info("senders size: {}", m_senders.size());
-
-        // check if the active track has changed
-        bool active_track_has_changed = m_senders.size() ? m_tracks.active()->get_track_number() != 
-                                         m_senders.back()->track().get_track_number() : true;
-        if (m_senders.size() == 0) {
-            make_new_pixel_sender();
-        } else if (active_track_has_changed || needs_resend) {
-            // cancel any pixels we're currently sending
-            if (m_senders.back()) {
-                // info("aborting the current sender");
-                m_senders.back()->abort();
-            }
-
-            send_clear();
-            make_new_pixel_sender();
-        }
-
-        m_senders.back()->send();
-        // debug("pixel sender sent!");
-    }
-
-    void send_clear() {
-        info("sending clear message to remote");
-
-        oscpkt::Message msg("/pixels/clear");
-        m_manager->send(msg);
-    }
 
     void send_cursor() {
         info("sending cursor message to remote");
@@ -105,7 +59,30 @@ public:
                 shared_ptr<haptic_track_t> active_track = m_tracks.active();
                 if (active_track)
                     active_track->set_cursor(index);
-                send_pixel_update(false, false);
+            }
+        });
+
+        // send a single pixel, given a mip map idx
+        m_manager->add_callback("/pixel",
+        [this](Msg& msg){
+            int index;
+            if (msg.arg().popInt32(index)
+                        .isOkNoMoreArgs()){
+                shared_ptr<haptic_track_t> active_track = m_tracks.active();
+
+                if (active_track) {
+                    m_pool.enqueue([this, active_track, index]() {
+                        info("getting pixel at {}", index);
+                        audio_pixel_t audio_pix = active_track->get_pixel(index);
+                        haptic_pixel_t haptic_pix(index, audio_pix);
+
+                        oscpkt::Message msg("/pixel");
+                        json j = haptic_pix;
+
+                        msg.pushStr(j.dump());
+                        m_manager->send(msg);
+                    });
+                }
             }
         });
 
@@ -118,18 +95,7 @@ public:
                 shared_ptr<haptic_track_t> active_track = m_tracks.active();
                 if (active_track)
                     active_track->zoom((double)amt);
-
-                // clear first, then update pixels
-                send_pixel_update(false, true);
             }
-        });
-
-        m_manager->add_callback("/init",
-        [this](Msg& msg){
-            info("received /init from remote controller");
-            m_tracks.add(GetTrack(project, 0));
-            // set cursor to 0
-            send_pixel_update(true, true);
         });
 
         m_manager->add_callback("/flush_map", 
@@ -147,7 +113,7 @@ public:
             info("received /sync from remote controller");
             shared_ptr<haptic_track_t> active_track = m_tracks.active();
             if (active_track) {
-                send_pixel_update(true, true);
+                send_cursor();
             }
         });
     }
@@ -161,5 +127,5 @@ public:
 private:
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
-    std::queue<unique_ptr<block_pixel_sender_t>> m_senders;
+    ThreadPool m_pool { 4 };
 };

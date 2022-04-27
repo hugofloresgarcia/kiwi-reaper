@@ -6,23 +6,6 @@
 #include "log.h"
 #include "include/ThreadPool/ThreadPool.h"
 
-// this is the pixel format that the iOS client expects
-class haptic_pixel_t {
-public: 
-    haptic_pixel_t() {};
-    haptic_pixel_t(int idx, audio_pixel_t pixel) : 
-        id(idx) 
-    {
-        value = abs(pixel.m_max) + abs(pixel.m_min) / 2; 
-    };
-
-    int id { 0 };
-    double value { 0 };
-
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(haptic_pixel_t, id, value);
-};
-
-using haptic_pixel_block_t = vec<haptic_pixel_t>;
 
 // interface class for pixel block sender
 // pixel senders send blocks of pixels to the OSC client

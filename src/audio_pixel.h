@@ -110,6 +110,24 @@ public:
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(audio_pixel_t, m_max, m_min, m_rms);
 };
 
+// this is the pixel format that the iOS client expects
+class haptic_pixel_t {
+public: 
+    haptic_pixel_t() {};
+    haptic_pixel_t(int idx, audio_pixel_t pixel) : 
+        id(idx) 
+    {
+        value = abs(pixel.m_max) + abs(pixel.m_min) / 2; 
+    };
+
+    int id { 0 };
+    double value { 0 };
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(haptic_pixel_t, id, value);
+};
+
+using haptic_pixel_block_t = vec<haptic_pixel_t>;
+
 // stores one block of mipmapped audio data, at a particular sample rate
 // should be able to update when the samples are updated
 // not thread safe by itself
