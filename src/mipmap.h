@@ -81,15 +81,20 @@ public:
         if (m_accessor->state_changed() || force) {
             info("mipmap: accessor state changed");
 
+            
+            m_abort = true;
+
             m_pool = std::make_unique<ThreadPool>(std::clamp(
                 std::thread::hardware_concurrency(), 2u, 16u
             ));
 
             auto buffer = std::make_shared<vec<double>>();
+            m_accessor->update();
             m_accessor->get_samples(*buffer);
 
             m_pool->enqueue([this, buffer, on_update](){
                 {
+                    m_abort = false;
                     std::lock_guard<std::mutex> lock(m_mutex);
                     
                     debug("mipmap: updating mipmap in worker thread");
@@ -102,6 +107,7 @@ public:
 
                         if (m_abort) {
                             info("mipmap: abort requested");
+                            m_abort = false;
                             return;
                         }
                     };
