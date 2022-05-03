@@ -52,6 +52,7 @@ add_library(kiwi SHARED
     src/haptic_track.h
     src/main.cpp
     src/log.h
+    src/ip.h
     src/osc.h
 )
   

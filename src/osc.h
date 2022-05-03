@@ -20,8 +20,11 @@ public:
     : m_addr(addr), m_send_port(send_port), m_recv_port(recv_port) {}
 
   bool init() {
+    info("connecting to {}:{}", m_addr, m_send_port);
+    info("binding to {}", m_recv_port);
     m_init = m_send_sock.connectTo(m_addr, m_send_port) \
               && m_recv_sock.bindTo(m_recv_port);
+    info("success: {}", (bool)m_init);
     return m_init;
   }
 

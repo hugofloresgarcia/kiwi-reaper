@@ -17,10 +17,63 @@
 
 #include "controller.h"
 
-static std::string ADDRESS = "192.168.0.198";
+#include "ip.h"
+
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
+std::string trim(const std::string& str,
+                 const std::string& whitespace = " ")
+{
+    const auto strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+
+    const auto strEnd = str.find_last_not_of(whitespace);
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
+
+std::string get_ip_address() {
+
+  std::string addr(50, ' ');
+  // load cached ip address (if it exists)
+  std::string ip_address_cache_file = resource_path + "/kiwi-ip.json";
+  std::ifstream ip_cache_ifs(ip_address_cache_file);
+  if (ip_cache_ifs.is_open()) {
+    info("found cached ip address");
+    json j;
+    ip_cache_ifs >> j;
+    addr = j["ip"].get<std::string>();
+  }
+  addr.resize(50, ' ');
+  
+
+  // prompt the user for an IP address
+  if (!GetUserInputs("kiwi setup", 1, "Enter iPhone IP address: ", addr.data(), addr.size())) {
+    ShowConsoleMsg("kiwi: failed to get IP address");
+    return 0;
+  }
+
+  // clean the IP address string
+  addr = std::string(addr.c_str()); // this is needed bc reaper adds a null terminator before the string actually ends
+  // remove whitespace
+  addr = trim(addr, " ");
+  if (!validateIP(addr)) {
+    ShowConsoleMsg("kiwi: invalid IP address");
+    return 0;
+  }
+
+  // cache the IP address if we validated successfully
+  std::ofstream ip_cache_ofs(ip_address_cache_file);
+  if (ip_cache_ofs.is_open()) {
+    info("caching ip address");
+    json j;
+    j["ip"] = addr;
+    ip_cache_ofs << j;
+  }
+}
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REAPER_PLUGIN_HINSTANCE instance, reaper_plugin_info_t *rec)
@@ -77,16 +130,19 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   REG_FUNC(AudioAccessorValidateState, rec);
 
   REG_FUNC(ValidatePtr2, rec);
+  REG_FUNC(GetUserInputs, rec);
 
   // create log file
   std::string resource_path = GetResourcePath();
   std::string log_path = resource_path + "/kiwi-log.txt";
   kiwi_logger_init(log_path);
 
+  std::string ADDRESS = get_ip_address();
+  
   // create controller
   osc_controller_t *controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);
   if (!controller->init()) {
-    ShowConsoleMsg("KIWI: failed to initialize OSC controller\n");
+    ShowConsoleMsg("kiwi: failed to initialize OSC controller. OSC Connection failed\n");
     return 0;
   }
 
