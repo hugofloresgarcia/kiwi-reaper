@@ -31,7 +31,7 @@ public:
 
     virtual ~osc_controller_t() {}
 
-   void OnTrackSelection(MediaTrack *trackid) override {
+    void OnTrackSelection(MediaTrack *trackid) override {
         // add the track to our map if we gotta
         m_tracks.add(trackid);
         m_tracks.active(trackid);
@@ -93,6 +93,9 @@ public:
 
     void send_cursor() {
         info("sending cursor message to remote");
+
+        // TODO: make sure that the cursor is within the bounds of the mipmap 
+        // before we send
 
         oscpkt::Message msg("/cursor");
         msg.pushStr(json(m_tracks.active()->get_cursor_mip_map_idx()).dump());

@@ -3,6 +3,9 @@
 #include "reaper_plugin_functions.h"
 #include "log.h"
 
+
+using std::pair; 
+
 // wraps an audio accessor
 class audio_accessor_t {
 public:
@@ -30,6 +33,8 @@ public:
 
         double t_start = GetAudioAccessorStartTime(m_accessor);
         double t_end = GetAudioAccessorEndTime(m_accessor);
+        m_time_bounds = std::make_pair(t_start, t_end);
+
         debug("mipmap: accessor start time: {}; end time: {};", t_start, t_end);
         if (t_end <= t_start) {
             info("mipmap: accessor end time is less than or equal to start time");
@@ -50,11 +55,13 @@ public:
             info("failed to get samples from accessor: error: {}", result);
             return false;
         } else {
-            debug("got {} samples from accessor", result);
+            debug("got result {} from accessor", result);
         }
 
         return true;
     }
+
+    pair<double, double> get_time_bounds() { return m_time_bounds; }
 
     int num_channels() const { 
         return (int)GetMediaTrackInfo_Value(m_track, "I_NCHAN"); 
@@ -80,6 +87,7 @@ public:
     };
     
 private:
+    pair<double, double> m_time_bounds;
     AudioAccessor* m_accessor {nullptr};
     MediaTrack* m_track {nullptr};
 };

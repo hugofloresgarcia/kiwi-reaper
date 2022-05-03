@@ -69,14 +69,15 @@ public:
         return m_active_block.get_pixels().at(m_active_channel).at(mip_map_index);
     }
 
-    static void set_cursor(int mip_map_idx) {
-        double t = mip_map_idx / GetHZoomLevel();
+    void set_cursor(int mip_map_idx) {
+        double t = mip_map_idx / GetHZoomLevel() + m_accessor->get_time_bounds().first;
         // debug("setting cursor to mipmap  l;index {}, at time {}", mip_map_idx, t);
         SetEditCurPos(t, true, true);
     }
 
-    static int get_cursor_mip_map_idx() {
-        double t = GetCursorPosition();
+    int get_cursor_mip_map_idx() {
+        double t0 = m_accessor->get_time_bounds().first;
+        double t = GetCursorPosition() - t0;
         int mip_map_idx = floor(t * GetHZoomLevel());
         // debug("getting cursor position, returning mipmap index {}", mip_map_idx);
         return mip_map_idx;

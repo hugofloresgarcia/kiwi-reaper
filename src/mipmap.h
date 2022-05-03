@@ -77,43 +77,39 @@ public:
 
     // update contents of the mipmap 
     // (if the audio accessor state has changed)
+    // if there is a worker thread already updating, then
+    // this function will do nothing. 
     bool update(mipmap_update_closure_t on_update, bool force = false){
+        if (m_busy)
+            return false; // already updating. 
+
         if (m_accessor->state_changed() || force) {
             info("mipmap: accessor state changed");
 
-            
-            m_abort = true;
-
-            m_pool = std::make_unique<ThreadPool>(std::clamp(
-                std::thread::hardware_concurrency(), 2u, 16u
-            ));
-
-            auto buffer = std::make_shared<vec<double>>();
-            m_accessor->update();
-            m_accessor->get_samples(*buffer);
-
-            m_pool->enqueue([this, buffer, on_update](){
+            m_pool->enqueue([this, on_update](){
                 {
-                    m_abort = false;
+                    debug("mipmap: updating mipmap in worker thread");
+                    m_busy = true;
+
+                    auto buffer = std::make_shared<vec<double>>();
+                    m_accessor->update();
+                    m_accessor->get_samples(*buffer);
+
                     std::lock_guard<std::mutex> lock(m_mutex);
                     
-                    debug("mipmap: updating mipmap in worker thread");
                     // pass samples to update audio pixel blocks
                     for (auto& it : m_blocks) {
                         debug("updating block {}", it.first);
                         it.second.update(*buffer, m_accessor->num_channels(), 
                                                 m_accessor->sample_rate());
                         it.second.transform();
-
-                        if (m_abort) {
-                            info("mipmap: abort requested");
-                            m_abort = false;
-                            return;
-                        }
                     };
                     debug("mipmap: finished updating mipmap in worker thread");
-                }
-                // make sure the lock is released before we call this
+                } // lock releases here
+
+                m_busy = false;
+                // make sure the lock is released before we call this, since 
+                // the caller may want to get a hold of the lock
                 on_update(*this);
             });
 
@@ -156,5 +152,5 @@ private:
     };
 
     std::mutex m_mutex;
-    std::atomic<bool> m_abort {false};
+    std::atomic<bool> m_busy {false};
 };
