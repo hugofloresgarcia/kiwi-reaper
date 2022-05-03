@@ -35,7 +35,7 @@ std::string trim(const std::string& str,
     return str.substr(strBegin, strRange);
 }
 
-std::string get_ip_address() {
+std::string get_ip_address(const std::string& resource_path) {
 
   std::string addr(50, ' ');
   // load cached ip address (if it exists)
@@ -50,11 +50,14 @@ std::string get_ip_address() {
   addr.resize(50, ' ');
   
 
-  // prompt the user for an IP address
   if (!GetUserInputs("kiwi setup", 1, "Enter iPhone IP address: ", addr.data(), addr.size())) {
     ShowConsoleMsg("kiwi: failed to get IP address");
-    return 0;
+    return "";
   }
+
+  // // tell the user what the ip address is
+  // std::string msg = std::string("kiwi: REAPER IP address ") + get_local_IP();
+  // ShowConsoleMsg(msg.c_str());
 
   // clean the IP address string
   addr = std::string(addr.c_str()); // this is needed bc reaper adds a null terminator before the string actually ends
@@ -62,7 +65,7 @@ std::string get_ip_address() {
   addr = trim(addr, " ");
   if (!validateIP(addr)) {
     ShowConsoleMsg("kiwi: invalid IP address");
-    return 0;
+    return "";
   }
 
   // cache the IP address if we validated successfully
@@ -73,6 +76,8 @@ std::string get_ip_address() {
     j["ip"] = addr;
     ip_cache_ofs << j;
   }
+
+  return addr;
 }
 
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
@@ -137,8 +142,8 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   std::string log_path = resource_path + "/kiwi-log.txt";
   kiwi_logger_init(log_path);
 
-  std::string ADDRESS = get_ip_address();
-  
+  std::string ADDRESS = get_ip_address(resource_path);
+
   // create controller
   osc_controller_t *controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);
   if (!controller->init()) {
