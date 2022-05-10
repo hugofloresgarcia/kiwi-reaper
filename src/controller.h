@@ -40,7 +40,19 @@ public:
         // add the track to our map if we gotta
         m_tracks.add(trackid);
         m_tracks.active(trackid);
+        info("set {} as the active track", (void*)trackid);
     };
+
+    void SetSurfaceSelected(MediaTrack* trackid, bool selected) override {
+        if (!selected) {
+            return;
+        }
+
+        // add the track to our map if we gotta
+        m_tracks.add(trackid);
+        m_tracks.active(trackid);
+        info("setsurface: set {} as the active track", (void*)trackid);
+    }
 
     void send_pixel(int mipmap_idx) {
         shared_ptr<haptic_track_t> active_track = m_tracks.active();
