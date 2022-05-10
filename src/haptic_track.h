@@ -92,6 +92,10 @@ public:
         return get_track_number(m_track);
     }
 
+    MediaTrack *get_track() const {
+        return m_track;
+    }
+
     //  track number 1-based, 0=not found, -1=master track (read-only, returns the int directly)
     static int get_track_number(MediaTrack* track) {
         debug("looking for the track number of track {:x}", (void*)track);

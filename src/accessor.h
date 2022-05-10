@@ -26,6 +26,8 @@ public:
     }
 
     bool get_samples(std::vector<double>& buffer) {
+        // TODO: if audio is longer than 28800000 samples (arbitrary, 
+        // then ask for the samples in chunks. 
         if (!this->is_valid()) {
             info("got invalid audio accessor for track {:x}", (void*)m_track);
             return false;

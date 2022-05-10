@@ -58,6 +58,8 @@ public:
 using haptic_pixel_block_t = vec<haptic_pixel_t>;
 haptic_pixel_block_t from(const vec<audio_pixel_t>& pixels, int start, int end){
     haptic_pixel_block_t block;
+    start = std::clamp(start, 0, (int)pixels.size());
+    end = std::clamp(end, start, (int)pixels.size());
     for (int i = start; i < end; i++) {
         block.push_back(haptic_pixel_t(i, pixels.at(i)));
     }

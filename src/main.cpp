@@ -136,6 +136,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
 
   REG_FUNC(ValidatePtr2, rec);
   REG_FUNC(GetUserInputs, rec);
+  REG_FUNC(Track_GetPeakInfo, rec);
 
   // create log file
   std::string resource_path = GetResourcePath();

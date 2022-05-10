@@ -9,6 +9,11 @@
 
 using std::unique_ptr;
 
+enum class controller_mode {
+    mipmap, 
+    meter
+};
+
 class osc_controller_t : IReaperControlSurface {
 
     osc_controller_t();
@@ -88,6 +93,8 @@ public:
 
                 debug("pixel block sent");
             });
+        } else {
+            info("no active track, can't send pixels");
         }
     }
 
@@ -102,6 +109,33 @@ public:
         m_manager->send(msg);
     }
     
+    void set_mode(const std::string mode) {
+        info("setting mode to {}", mode);
+        if (mode == "mipmap") {
+            m_mode = controller_mode::mipmap;
+        } else if (mode == "meter") {
+            m_mode = controller_mode::meter;
+        } else {
+            warn("invalid controller mode given: {}", mode);
+        }
+    }
+
+    // TODO: un-
+    void send_peaks() {
+        if (!m_tracks.active()) {
+            info("no active track, can't send peaks");
+            return;
+        }
+
+        double level = Track_GetPeakInfo(m_tracks.active()->get_track(), 
+                                m_tracks.active()->get_active_channel());
+
+        oscpkt::Message msg("/peak");
+        json j = level;
+        msg.pushStr(j.dump());
+        m_manager->send(msg);
+    }
+
     // use this to register all callbacks with the osc manager
     void add_callbacks() {
         using Msg = oscpkt::Message;
@@ -174,23 +208,41 @@ public:
                 send_cursor();
             }
         });
+
+        m_manager->add_callback("/set_mode",
+        [this](Msg& msg){
+            std::string mode;
+            if (msg.arg().popStr(mode)
+                        .isOkNoMoreArgs()){
+                set_mode(mode);
+            }
+        });
+
     }
 
     // this runs about 30x per second. do all OSC polling here
     virtual void Run() override {
-        auto active_track  = m_tracks.active();
-        if (active_track) {
-            // check for updates
-            auto mipmap = active_track->mipmap();
-            if (mipmap) {
-                mipmap->update(mipmap_update_closure_t(), false);
-            }
-        }
         // handle any packets
         m_manager->handle_receive(false);
+
+        auto active_track  = m_tracks.active();
+        if (!active_track) { return; }
+        switch (m_mode) {
+            case controller_mode::mipmap:
+                // check for updates
+                if (active_track->mipmap()) {
+                    active_track->mipmap()->update(mipmap_update_closure_t(), false);
+                }
+                break;
+
+            case controller_mode::meter:
+                send_peaks();
+                break;
+        }
     }
 
 private:
+    controller_mode m_mode {controller_mode::mipmap};
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     ThreadPool m_pool { 4 };
