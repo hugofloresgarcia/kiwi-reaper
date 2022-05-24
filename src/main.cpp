@@ -22,6 +22,19 @@
 static int SEND_PORT = 8000;
 static int RECV_PORT = 8001;
 
+// moved these out for the action to have access to them
+int CONNECTION_ACTION_ID;
+osc_controller_t *controller;
+
+static bool kiwi_connection_status(int commandId, int flag)
+{
+	if (commandId == CONNECTION_ACTION_ID) {
+    ShowConsoleMsg("Kiwi Connection Status...)");
+		return true;
+	}
+	return false;
+}
+
 std::string trim(const std::string& str,
                  const std::string& whitespace = " ")
 {
@@ -145,13 +158,25 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
 
   std::string ADDRESS = get_ip_address(resource_path);
 
+  // register kiwi connection action
+  CONNECTION_ACTION_ID = rec->Register("command_id", (void*)"KiwiConnectionStatus");
+  gaccel_register_t accelerator;
+  accelerator.accel.fVirt = 0;
+  accelerator.accel.key = 0;
+  accelerator.accel.cmd = CONNECTION_ACTION_ID;
+  accelerator.desc = "Check connection status of kiwi haptic interface";
+  if (!rec->Register("gaccel", &accelerator)) 
+    return 0;
+
+  if (!rec->Register("hookcommand", &kiwi_connection_status)) 
+    return 0;
+
   // create controller
-  osc_controller_t *controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);
+  controller = new osc_controller_t(ADDRESS, SEND_PORT, RECV_PORT);
   if (!controller->init()) {
     ShowConsoleMsg("kiwi: failed to initialize OSC controller. OSC Connection failed\n");
     return 0;
   }
-
   // register action hooks
   if (!rec->Register("csurf_inst", (void *)controller))
     return 0;
