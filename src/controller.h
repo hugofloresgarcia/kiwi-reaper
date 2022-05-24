@@ -5,6 +5,10 @@
 #include "osc.h"
 #include "log.h"
 
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 #define project nullptr
 
 using std::unique_ptr;
@@ -148,6 +152,21 @@ public:
         m_manager->send(msg);
     }
 
+    bool get_connection_status() {
+        // resets the connection status
+        m_connection_status = false;
+
+        std::thread t([this]() 
+        {
+            ping_controller();
+        });
+        t.detach();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        return m_connection_status;
+    }
+
     // use this to register all callbacks with the osc manager
     void add_callbacks() {
         using Msg = oscpkt::Message;
@@ -229,7 +248,11 @@ public:
                 set_mode(mode);
             }
         });
-
+        
+        m_manager->add_callback("/ping_ack", 
+        [this](Msg& msg){
+            m_connection_status = true;
+        });
     }
 
     // this runs about 30x per second. do all OSC polling here
@@ -258,4 +281,10 @@ private:
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     ThreadPool m_pool { 4 };
+    bool m_connection_status;
+
+    void ping_controller() {
+        oscpkt::Message msg("/ping");
+        m_manager->send(msg);
+    }
 };

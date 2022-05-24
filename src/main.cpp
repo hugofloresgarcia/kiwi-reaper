@@ -11,6 +11,7 @@
 #define REG_FUNC(x,y) (*(void **)&x) = y->GetFunc(#x) ; BAIL_IF_NO_REG(x) ;
 
 #include "reaper_plugin_functions.h"
+#include <condition_variable>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -29,7 +30,13 @@ osc_controller_t *controller;
 static bool kiwi_connection_status(int commandId, int flag)
 {
 	if (commandId == CONNECTION_ACTION_ID) {
-    ShowConsoleMsg("Kiwi Connection Status...)");
+    bool connection_status = controller->get_connection_status();
+
+    if (connection_status)  
+      ShowConsoleMsg("Kiwi Haptic Interface is connected.");
+    else 
+      ShowConsoleMsg("Kiwi Haptic Interface is not connected.");
+      
 		return true;
 	}
 	return false;
