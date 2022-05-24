@@ -13,6 +13,8 @@
 
 using std::unique_ptr;
 
+int TIMEOUT = 500;
+
 enum class controller_mode {
     mipmap, 
     meter
@@ -162,7 +164,7 @@ public:
         });
         t.detach();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(TIMEOUT));
 
         return m_connection_status;
     }
