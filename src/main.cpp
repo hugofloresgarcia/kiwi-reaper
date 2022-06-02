@@ -175,7 +175,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   if (!rec->Register("gaccel", &accelerator)) 
     return 0;
 
-  if (!rec->Register("hookcommand", &kiwi_connection_status)) 
+  if (!rec->Register("hookcommand", (void *)&kiwi_connection_status)) 
     return 0;
 
   // create controller

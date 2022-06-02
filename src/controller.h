@@ -13,7 +13,7 @@
 
 using std::unique_ptr;
 
-int TIMEOUT = 500;
+int TIMEOUT = 2000;
 
 enum class controller_mode {
     mipmap, 
@@ -158,12 +158,8 @@ public:
         // resets the connection status
         m_connection_status = false;
 
-        std::thread t([this]() 
-        {
-            ping_controller();
-        });
-        t.detach();
-
+        oscpkt::Message msg("/ping");
+        m_manager->send(msg);
         std::this_thread::sleep_for(std::chrono::milliseconds(TIMEOUT));
 
         return m_connection_status;
@@ -255,6 +251,12 @@ public:
         [this](Msg& msg){
             m_connection_status = true;
         });
+
+        m_manager->add_callback("/ping", 
+        [this](Msg& msg){
+            oscpkt::Message ackmsg("/ping_ack");
+            m_manager->send(ackmsg);
+        });
     }
 
     // this runs about 30x per second. do all OSC polling here
@@ -283,10 +285,5 @@ private:
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     ThreadPool m_pool { 4 };
-    bool m_connection_status;
-
-    void ping_controller() {
-        oscpkt::Message msg("/ping");
-        m_manager->send(msg);
-    }
+    std::atomic<bool> m_connection_status;
 };
