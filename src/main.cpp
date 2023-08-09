@@ -36,8 +36,8 @@ std::string trim(const std::string& str,
 }
 
 std::string get_ip_address(const std::string& resource_path) {
-
-  std::string addr(50, ' ');
+  size_t addrsize = 16;
+  std::string addr(addrsize, ' ');
   // load cached ip address (if it exists)
   std::string ip_address_cache_file = resource_path + "/kiwi-ip.json";
   std::ifstream ip_cache_ifs(ip_address_cache_file);
@@ -46,8 +46,9 @@ std::string get_ip_address(const std::string& resource_path) {
     json j;
     ip_cache_ifs >> j;
     addr = j["ip"].get<std::string>();
+    addr.resize(addrsize, ' ');
   }
-  addr.resize(50, ' ');
+
   
 
   if (!GetUserInputs("kiwi setup", 1, "Enter iPhone IP address: ", addr.data(), addr.size())) {
@@ -142,6 +143,23 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(
   std::string resource_path = GetResourcePath();
   std::string log_path = resource_path + "/kiwi-log.txt";
   kiwi_logger_init(log_path);
+
+  // print our log path and resource path
+  info("kiwi: log path: %s", log_path.c_str());
+  info("kiwi: resource path: %s", resource_path.c_str());
+
+
+  // check if we have permission to write to the resource path
+  // try opening a new file in the resource path
+
+  std::string test_file_path = resource_path + "/kiwi-test.txt";
+  std::ofstream test_file(test_file_path);
+  if (!test_file.is_open()) {
+    ShowConsoleMsg("kiwi: failed to open test file in resource path. Please check permissions");
+  }
+
+
+  
 
   std::string ADDRESS = get_ip_address(resource_path);
 

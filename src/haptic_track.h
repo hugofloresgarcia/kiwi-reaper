@@ -24,7 +24,7 @@ public:
     };
   
     void setup() {
-        debug("setting up haptic track with address {:x}", (void*)m_track);
+        // debug("setting up haptic track with address {:p}", (void*)m_track);
         if (!m_track) {
             info ("track is null. nothing to set up");
             return;
@@ -98,7 +98,7 @@ public:
 
     //  track number 1-based, 0=not found, -1=master track (read-only, returns the int directly)
     static int get_track_number(MediaTrack* track) {
-        debug("looking for the track number of track {:x}", (void*)track);
+        // debug("looking for the track number of track {:p}", (void*)track);
         return GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER");
     }
 
@@ -110,9 +110,9 @@ private:
     // asks the mipmap for an interpolated block of pixels
     // use this to update the internal active block
     audio_pixel_block_t calculate_pixels() {
-        debug("getting pixels for track {:x}", (void*)m_track);
+        // debug("getting pixels for track {:p}", (void*)m_track);
         if (!m_mipmap) {
-            debug("no mipmap for track {:x}", (void*)m_track);
+            // debug("no mipmap for track {:p}", (void*)m_track);
             return audio_pixel_block_t();
         }
         double pix_per_s = GetHZoomLevel();
@@ -159,7 +159,7 @@ public:
     };
 
     void add(MediaTrack* track) {
-        debug("adding haptic track with address {:x}", (void*)track);
+        // debug("adding haptic track with address {:p}", (void*)track);
         int tracknum = haptic_track_t::get_track_number(track);
         if (tracknum == 0) 
             track = nullptr;
