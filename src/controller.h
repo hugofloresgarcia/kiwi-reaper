@@ -5,9 +5,15 @@
 #include "osc.h"
 #include "log.h"
 
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 #define project nullptr
 
 using std::unique_ptr;
+
+int TIMEOUT = 2000;
 
 enum class controller_mode {
     mipmap, 
@@ -139,13 +145,29 @@ public:
             return;
         }
 
+        info("querying peak level from track {} and channel {}", 
+                (void*)m_tracks.active()->get_track(), 
+                m_tracks.active()->get_active_channel()
+        );
         double level = Track_GetPeakInfo(m_tracks.active()->get_track(), 
                                 m_tracks.active()->get_active_channel());
+        info("sending peak level: {}", level);
 
         oscpkt::Message msg("/peak");
         json j = level;
         msg.pushStr(j.dump());
         m_manager->send(msg);
+    }
+
+    bool get_connection_status() {
+        // resets the connection status
+        m_connection_status = false;
+
+        oscpkt::Message msg("/ping");
+        m_manager->send(msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(TIMEOUT));
+
+        return m_connection_status;
     }
 
     // use this to register all callbacks with the osc manager
@@ -229,7 +251,18 @@ public:
                 set_mode(mode);
             }
         });
+        
+        m_manager->add_callback("/ping_ack", 
+        [this](Msg& msg){
+            m_connection_status = true;
+        });
 
+        m_manager->add_callback("/ping", 
+        [this](Msg& msg){
+            info("received /ping from remote controller");
+            oscpkt::Message ackmsg("/ping_ack");
+            m_manager->send(ackmsg);
+        });
     }
 
     // this runs about 30x per second. do all OSC polling here
@@ -258,4 +291,5 @@ private:
     shared_ptr<osc_manager_t> m_manager {nullptr};
     haptic_track_map_t m_tracks;
     ThreadPool m_pool { 4 };
+    std::atomic<bool> m_connection_status;
 };
