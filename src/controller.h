@@ -145,8 +145,13 @@ public:
             return;
         }
 
+        info("querying peak level from track {} and channel {}", 
+                (void*)m_tracks.active()->get_track(), 
+                m_tracks.active()->get_active_channel()
+        );
         double level = Track_GetPeakInfo(m_tracks.active()->get_track(), 
                                 m_tracks.active()->get_active_channel());
+        info("sending peak level: {}", level);
 
         oscpkt::Message msg("/peak");
         json j = level;
@@ -254,6 +259,7 @@ public:
 
         m_manager->add_callback("/ping", 
         [this](Msg& msg){
+            info("received /ping from remote controller");
             oscpkt::Message ackmsg("/ping_ack");
             m_manager->send(ackmsg);
         });
